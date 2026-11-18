@@ -94,7 +94,17 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Installer FFmpeg
-        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-inter fonts-dejavu-core
+        timeout-minutes: 8
+        run: |
+          # L'installation bloquait parfois plusieurs minutes : delai par essai, 3 essais, puis echec net.
+          for i in 1 2 3; do
+            if timeout 150 bash -c 'sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 update -y && sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 install -y ffmpeg fonts-inter fonts-dejavu-core'; then
+              break
+            fi
+            echo "Installation de FFmpeg : essai $i echoue"
+            if [ "$i" = 3 ]; then exit 1; fi
+            sleep 5
+          done
 
       - name: Se connecter a Google (sans cle)
         id: google
