@@ -101,8 +101,8 @@ jobs:
         if: ${{ inputs.drive_file_id != '' }}
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: projects/59127381813/locations/global/workloadIdentityPools/capt-github/providers/github
-          service_account: capt-lecture-drive@project-8b78492b-1cda-4529-af3.iam.gserviceaccount.com
+          workload_identity_provider: projects/932617480820/locations/global/workloadIdentityPools/capt-github/providers/github
+          service_account: capt-lecture-drive@gen-lang-client-0475572474.iam.gserviceaccount.com
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/drive.readonly
 
