@@ -484,36 +484,6 @@ def charger_animations_supabase():
         return {}
 
 
-def charger_modeles_genres():
-    """Styles generiques corporate / impact / karaoke : {code: style}. Table Clients (lignes inactives comprises,
-    elles ne sont plus choisies par le titre), sinon fichiers styles/*.json. Ils servent de reference aux genres
-    que l'agent choisit sous-titre par sous-titre ; la marque garde sa police et ses couleurs."""
-    modeles = {}
-    for code in render.GENRES:
-        chemin = os.path.join(DOSSIER_STYLES, code + ".json")
-        if os.path.exists(chemin):
-            modeles[code] = json.load(open(chemin, encoding="utf-8"))
-    url, cle = os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY")
-    if url and cle:
-        en_tetes = {"apikey": cle, "User-Agent": "capt-sous-titres/1.0"}
-        if cle.startswith("eyJ"):
-            en_tetes["Authorization"] = f"Bearer {cle}"
-        req = urllib.request.Request(url.rstrip("/") + "/rest/v1/Clients?select=code,style&code=in.(" + ",".join(render.GENRES) + ")", headers=en_tetes)
-        try:
-            for l in json.loads(urllib.request.urlopen(req, timeout=30).read()):
-                if isinstance(l.get("style"), dict):
-                    modeles[l["code"].lower()] = l["style"]
-        except Exception:
-            pass
-    return modeles
-
-
-def genre_du_sous_titre(s):
-    """Genre demande par l'agent pour un sous-titre : corporate / impact / karaoke, sinon None (style de la marque)."""
-    g = render.normaliser(str(s.get("genre") or "")).strip()
-    return g if g in render.GENRES else None
-
-
 def resoudre_style(client_saisi, nom_video):
     """Style du client : Supabase d'abord, sinon fichiers locaux. Si la marque est inconnue, ambigue ou son style
     inutilisable, le style « Par defaut » est applique. Retourne (style, nom_client, fichier_style, alias, alertes)."""
@@ -643,7 +613,7 @@ def blocs_depuis_subs(subs, style):
             if render.normaliser(m["mot"]) in surligner:
                 m["cle"] = "principal"
         marquer_impact(mots, s.get("impact"), cfg_impact)
-        blocs.append({"debut": debut, "fin": fin, "mots": mots, "genre": genre_du_sous_titre(s)})
+        blocs.append({"debut": debut, "fin": fin, "mots": mots})
     for prev, cur in zip(blocs, blocs[1:]):               # jamais de chevauchement
         if cur["debut"] < prev["fin"] + 0.02:
             prev["fin"] = max(prev["debut"] + 0.1, cur["debut"] - 0.02)
@@ -686,7 +656,7 @@ def phase_rendu(video, nom_video, client_saisi, sortie, subs_json, style_json):
         hauteur = int(round(hauteur * style["resolution"][0] / largeur / 2) * 2)
         largeur = style["resolution"][0]
     blocs = blocs_depuis_subs(subs, style)
-    ass = render.generer_ass(blocs, style, largeur, hauteur, nom_police, [], DOSSIER_POLICES, charger_modeles_genres())
+    ass = render.generer_ass(blocs, style, largeur, hauteur, nom_police, [], DOSSIER_POLICES)
     open(os.path.join(sortie, "subtitles.ass"), "w", encoding="utf-8").write(ass)
     open(os.path.join(sortie, "subtitles.srt"), "w", encoding="utf-8").write(render.generer_srt(blocs))
 

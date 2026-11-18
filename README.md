@@ -26,14 +26,6 @@ Le style « Par défaut » (`Clients.code = 'default'`) s'applique tout seul qua
 
 Les styles génériques (`default`, `corporate`, `impact`, `karaoke`) sont réglés pour 1080×1920 avec des marges de sécurité : 120 px de chaque côté, texte au-dessus des 420 px du bas et sous les 250 px du haut. Leurs lignes sont mesurées avec la vraie police (`mesure_exacte`) et un bloc qui déborde est réduit.
 
-## Genres de style choisis par l'agent
-
-`corporate`, `impact` et `karaoke` ne se choisissent plus par le titre de la vidéo (leurs lignes de la table `Clients` sont inactives). L'agent de sous-titrage décide, sous-titre par sous-titre, de rester dans le style de la marque ou d'utiliser un genre : champ `genre` de `subs.json` (absent = style de la marque).
-
-- Le rendu garde la police, les couleurs et la position de la marque ; le genre change l'animation, la casse, la graisse et la taille (`render.style_genre`).
-- `corporate` : apparition progressive, casse normale. `impact` : majuscules, gras, +10 %, effet pop. `karaoke` : le mot prononcé s'allume, les autres sont grisés.
-- Réglages de référence : lignes `corporate`, `impact`, `karaoke` de `Clients` (sinon `styles/*.json`). `Clients.style.genres_autorises` peut restreindre les genres d'une marque.
-
 ## Gamme « animation » : impact
 
 L'agent peut mettre en valeur un mot ou une courte phrase avec l'effet **impact**, quelle que soit la marque : même police que le texte de la marque, couleur de marque, et en plus **gras**, **agrandi** et/ou **capitales**. Champ `impact` de `subs.json` : `[{"texte": "mots exacts du sous-titre", "effets": ["agrandi"]}]`.

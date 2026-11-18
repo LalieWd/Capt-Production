@@ -320,41 +320,6 @@ def limiter_mots_cles(blocs, style):
 # Un mot ou une courte phrase peut etre mis en impact par-dessus le style de la marque : meme police que le
 # texte de la marque et sa couleur de marque, avec en plus gras, agrandi et/ou capitales.
 # Les reglages viennent de la table Supabase Animations (defauts) puis de Clients.style.impact (par marque).
-GENRES = ("corporate", "impact", "karaoke")
-GRIS_INACTIF = "#B8B8B8"
-
-
-def style_genre(style, genre, modele=None):
-    """Style de la marque habille d'un genre (corporate / impact / karaoke) choisi par l'agent pour un sous-titre.
-    La police, les couleurs et la position de la marque sont conservees ; le genre change l'animation, la casse,
-    la graisse et la taille. `modele` = style generique du genre (table Clients) : sert de reference."""
-    if genre not in GENRES:
-        return style
-    import copy
-    st = copy.deepcopy(style)
-    modele = modele or {}
-    mp, ma = modele.get("police", {}), modele.get("animation", {})
-    st["animation"] = dict(st["animation"], mode=ma.get("mode") or {"corporate": "progressive", "impact": "pop", "karaoke": "karaoke"}[genre],
-                           duree_fade_ms=ma.get("duree_fade_ms", st["animation"].get("duree_fade_ms", 150)))
-    p = st["police"]
-    if genre == "corporate":
-        p["casse"] = "phrase"
-    elif genre == "impact":
-        p["casse"] = "majuscules"
-        p["gras"] = True
-        ratio = 1.1
-        if "taille_em_px" in p:
-            p["taille_em_px"] = p["taille_em_px"] * ratio
-        else:
-            p["taille_px"] = p["taille_px"] * ratio
-    else:      # karaoke : le mot prononce s'allume ; les mots a venir sont grises
-        c = st["couleurs"]
-        if c.get("texte_inactif", c["texte"]).upper() == c["texte"].upper():
-            c["texte_inactif"] = GRIS_INACTIF
-        c["mot_cle_accent"] = couleur_impact(st, reglages_impact(st))
-    return st
-
-
 IMPACT_DEFAUT = {
     "effets_autorises": ["gras", "agrandi", "capitales"],
     "effets_defaut": ["agrandi"],
@@ -433,7 +398,7 @@ def preparer_impact_ligne(ligne, style, taille):
 
 
 # ---------- sortie ASS ----------
-def generer_ass(blocs, style, largeur, hauteur, nom_police, titres=None, dossier_polices="fonts", modeles_genres=None):
+def generer_ass(blocs, style, largeur, hauteur, nom_police, titres=None, dossier_polices="fonts"):
     global _DOSSIER_POLICES
     _DOSSIER_POLICES = dossier_polices
     k = hauteur / style["resolution"][1]          # echelle verticale
@@ -471,16 +436,8 @@ Style: Defaut,{nom_police},{taille:.1f},{couleur_ass(c['texte'])},{couleur_ass(c
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     lignes = []
-    style_marque = style
     for b in blocs:
         b0 = b["debut"]
-        genre = b.get("genre")
-        style = style_genre(style_marque, genre, (modeles_genres or {}).get(genre)) if genre in GENRES else style_marque
-        p, c, an = style["police"], style["couleurs"], style["animation"]
-        mode = an.get("mode", "statique")
-        fade = int(an.get("duree_fade_ms", 150))
-        gras = -1 if p.get("gras", p.get("graisse", "").lower() in ("bold", "black", "heavy")) else 0
-        ft = taille_ass(p) / taille_ass(style_marque["police"])      # taille du genre / taille de la marque
         for w in b["mots"]:
             w.setdefault("facteur_largeur", 1.0)
         taille_calc = taille_em(style["police"]) * 1.056
@@ -495,7 +452,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 reduction = min(reduction, max(0.7, ml["largeur_max_px"] / max(largeur_ligne(ligne, style, taille_calc), 1)))
         for ligne in mise_en_page:
             parts = []
-            echelles.append(reduction * ft * max([(w.get("impact_echelle", 1.0) if w.get("impact") else (style["mots_cles"]["echelle"] if w.get("cle") else 1)) for w in ligne]))
+            echelles.append(reduction * max([(w.get("impact_echelle", 1.0) if w.get("impact") else (style["mots_cles"]["echelle"] if w.get("cle") else 1)) for w in ligne]))
             for w in ligne:
                 texte = w["mot"].upper() if p.get("casse") == "majuscules" else w["mot"]
                 texte = texte.replace("{", "(").replace("}", ")")
@@ -521,7 +478,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     if "gras" in imp:
                         pg = cfg.get("police_gras") or {}
                         police_impact = f"\\fn{pg.get('famille') or nom_police}\\b{pg.get('b', 1)}"
-                echelle = int(round(echelle * reduction * ft))
+                echelle = int(round(echelle * reduction))
                 tags = f"\\1c{couleur_ass(col)}\\fscx{echelle}\\fscy{echelle}"
                 if p.get("famille_mot_cle") and not imp:   # mot cle en gras (police dediee) seulement si mots_cles.gras ; sinon meme police
                     if cle and style["mots_cles"].get("gras", True):
@@ -538,12 +495,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     actif = couleur_ass(col if imp else (c.get("mot_cle_accent", "#FFD400") if cle else c["texte"]))
                     tags = (f"\\1c{inactif}\\fscx{echelle}\\fscy{echelle}"
                             f"\\t({a},{a + 1},\\1c{actif})\\t({fin_mot},{fin_mot + 1},\\1c{inactif})")
-                if genre in GENRES:
-                    tags += f"\\b{abs(gras)}"
-                    if genre == "impact" and not imp:
-                        pg = reglages_impact(style).get("police_gras") or {}
-                        if pg.get("famille"):
-                            tags += f"\\fn{pg['famille']}"
                 if imp:
                     tags += police_impact
                     if reglages_impact(style).get("animation") == "pop" and mode in ("statique", "progressive"):
@@ -570,7 +521,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if ml.get("interligne", 1) != 1:
             pass  # l'interligne est gere par la police ; valeur gardee pour usage futur
         lignes.append(f"Dialogue: 0,{temps_ass(b['debut'])},{temps_ass(b['fin'])},Defaut,,0,0,0,,{{{debut_tag}}}{corps}")
-    lignes = generer_bandeaux(titres, style_marque, largeur, hauteur, dossier_polices) + lignes
+    lignes = generer_bandeaux(titres, style, largeur, hauteur, dossier_polices) + lignes
     return entete + "\n".join(lignes) + "\n"
 
 
