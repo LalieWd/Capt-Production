@@ -51,6 +51,26 @@ on:
         description: "Ajoute automatiquement par le noeud GitHub de n8n"
         required: false
         default: ""
+      phase:
+        description: "Mode n8n en deux phases : transcription ou render. Vide = fonctionnement historique"
+        required: false
+        default: ""
+      title:
+        description: "Titre de la video (n8n). Remplace video_name s'il est vide"
+        required: false
+        default: ""
+      client_code:
+        description: "Code du client (n8n). Remplace client s'il est vide"
+        required: false
+        default: ""
+      attempt:
+        description: "Numero de la tentative de rendu (n8n, 1 a 3)"
+        required: false
+        default: ""
+      subs:
+        description: "Sous-titres valides par n8n au format JSON (phase render)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -64,6 +84,11 @@ jobs:
       CALLBACK_URL: ${{ inputs.callback_url || inputs.resumeUrl || secrets.CAPT_CALLBACK_URL }}
       JOB_ID: ${{ inputs.job_id }}
       REVISION: ${{ inputs.revision }}
+      PHASE: ${{ inputs.phase }}
+      ATTEMPT: ${{ inputs.attempt }}
+      TITLE: ${{ inputs.title }}
+      CLIENT_CODE: ${{ inputs.client_code }}
+      DRIVE_ID: ${{ inputs.drive_file_id }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
@@ -106,9 +131,10 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          VIDEO_NAME: ${{ inputs.video_name || inputs.video_path }}
-          CLIENT: ${{ inputs.client }}
-          STYLE: ${{ inputs.style }}
+          VIDEO_NAME: ${{ inputs.video_name || inputs.title || inputs.video_path }}
+          CLIENT: ${{ inputs.client || inputs.client_code }}
+          STYLE: ${{ inputs.style }}      # en mode n8n : ajustements de style en JSON
+          SUBS: ${{ inputs.subs }}
         run: python3 process.py video.mp4 "$VIDEO_NAME" "$CLIENT" out "$STYLE"
 
       - name: Garder les fichiers
@@ -120,10 +146,14 @@ jobs:
             out/subtitles.srt
             out/subtitles.ass
             out/report.json
+            out/mots.json
+            out/subs_used.json
+            out/capture_*.jpg
+          if-no-files-found: ignore
 
       - name: Envoyer le resultat dans Supabase Storage (mode jobs)
         id: stockage
-        if: ${{ inputs.job_id != '' }}
+        if: ${{ inputs.job_id != '' && inputs.phase != 'transcription' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
@@ -131,8 +161,9 @@ jobs:
           set -euo pipefail
           AUTH=()
           case "$SUPABASE_KEY" in eyJ*) AUTH=(-H "Authorization: Bearer $SUPABASE_KEY");; esac
+          SUFFIXE=""; [ -n "$ATTEMPT" ] && SUFFIXE="-a${ATTEMPT}"   # mode n8n : une version par tentative de rendu
           envoyer() {   # $1 = fichier local, $2 = nom dans le bucket, $3 = type MIME ; ecrit l'URL signee (7 jours)
-            P="jobs/${JOB_ID}/v${REVISION}/$2"
+            P="jobs/${JOB_ID}/v${REVISION}${SUFFIXE}/$2"
             curl -fsS -X POST "$SUPABASE_URL/storage/v1/object/sorties/$P" -H "apikey: $SUPABASE_KEY" "${AUTH[@]}" \
               -H "Content-Type: $3" -H "x-upsert: true" --data-binary @"$1" > /dev/null
             CHEMIN=$(curl -fsS -X POST "$SUPABASE_URL/storage/v1/object/sign/sorties/$P" -H "apikey: $SUPABASE_KEY" "${AUTH[@]}" \
@@ -142,8 +173,47 @@ jobs:
           echo "mp4=$(envoyer out/subtitled.mp4 sous-titree.mp4 video/mp4)" >> "$GITHUB_OUTPUT"
           echo "srt=$(envoyer out/subtitles.srt sous-titres.srt application/x-subrip)" >> "$GITHUB_OUTPUT"
 
+      - name: Prevenir n8n (phase transcription)
+        if: ${{ inputs.phase == 'transcription' && inputs.job_id != '' && env.CALLBACK_URL != '' }}
+        run: |
+          jq -n --arg job_id "$JOB_ID" --arg revision "$REVISION" --arg attempt "$ATTEMPT" --arg run_url "$RUN_URL" \
+            --rawfile mots out/mots.json \
+            '{status:"success", phase:"transcription", job_id:$job_id, revision:$revision, attempt:$attempt, run_url:$run_url, mots:$mots}' \
+            | curl -fsS -X POST -H "Content-Type: application/json" --data @- "$CALLBACK_URL"
+
+      - name: Prevenir n8n (phase render)
+        if: ${{ inputs.phase == 'render' && inputs.job_id != '' && env.CALLBACK_URL != '' }}
+        env:
+          MP4_URL: ${{ steps.stockage.outputs.mp4 }}
+          SRT_URL: ${{ steps.stockage.outputs.srt }}
+        run: |
+          # multipart : les champs texte arrivent dans body.*, les fichiers (capture_1..6, rapport) en binaire dans n8n.
+          # La video et le .srt sont trop lourds pour le webhook : n8n les telecharge via video_url / srt_url.
+          args=(-fsS -X POST "$CALLBACK_URL"
+            --form-string "status=success" --form-string "phase=render"
+            --form-string "job_id=$JOB_ID" --form-string "revision=$REVISION" --form-string "attempt=$ATTEMPT"
+            --form-string "drive_file_id=$DRIVE_ID" --form-string "title=$TITLE" --form-string "client_code=$CLIENT_CODE"
+            --form-string "run_url=$RUN_URL" --form-string "video_url=$MP4_URL" --form-string "srt_url=$SRT_URL"
+            -F "subs=<out/subs_used.json" -F "style=<out/style_input.json" -F "errors=<out/errors.txt"
+            -F "rapport=@out/report.json;type=application/json")
+          for f in out/capture_*.jpg; do
+            [ -f "$f" ] && args+=(-F "$(basename "${f%.jpg}")=@${f};type=image/jpeg")
+          done
+          curl "${args[@]}"
+
+      - name: Prevenir n8n en cas d'echec (phases n8n)
+        if: ${{ failure() && inputs.phase != '' && inputs.job_id != '' && env.CALLBACK_URL != '' }}
+        run: |
+          RAISON=$( [ -f out/report.json ] && jq -r '.raison // "erreur pendant le traitement"' out/report.json || echo "erreur pendant le traitement" )
+          args=(-fsS -X POST "$CALLBACK_URL"
+            --form-string "status=error" --form-string "phase=$PHASE"
+            --form-string "job_id=$JOB_ID" --form-string "revision=$REVISION" --form-string "attempt=$ATTEMPT"
+            --form-string "run_url=$RUN_URL" --form-string "errors=$RAISON")
+          [ -f out/report.json ] && args+=(-F "rapport=@out/report.json;type=application/json")
+          curl "${args[@]}"
+
       - name: Prevenir n8n (mode jobs)
-        if: ${{ inputs.job_id != '' && env.CALLBACK_URL != '' }}
+        if: ${{ inputs.job_id != '' && inputs.phase == '' && env.CALLBACK_URL != '' }}
         env:
           MP4_URL: ${{ steps.stockage.outputs.mp4 }}
           SRT_URL: ${{ steps.stockage.outputs.srt }}
@@ -154,7 +224,7 @@ jobs:
             | curl -fsS -X POST -H "Content-Type: application/json" --data @- "$CALLBACK_URL"
 
       - name: Prevenir n8n en cas d'echec (mode jobs)
-        if: ${{ failure() && inputs.job_id != '' && env.CALLBACK_URL != '' }}
+        if: ${{ failure() && inputs.job_id != '' && inputs.phase == '' && env.CALLBACK_URL != '' }}
         run: |
           RAISON=$( [ -f out/report.json ] && jq -r '.raison // "erreur pendant le traitement"' out/report.json || echo "erreur pendant le traitement" )
           jq -n --arg job_id "$JOB_ID" --arg revision "$REVISION" --arg run_url "$RUN_URL" --arg raison "$RAISON" \
