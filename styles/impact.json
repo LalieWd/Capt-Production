@@ -2,7 +2,7 @@
   "client": "Genre : impact (TikTok punchy, majuscules, mots clés jaunes)",
   "code": "IMPACT",
   "genre": "impact",
-  "version": "1.0",
+  "version": "1.1",
   "resolution": [
     1080,
     1920
@@ -12,7 +12,7 @@
     "graisse": "Bold",
     "fichier": null,
     "fallback": "Inter",
-    "taille_px": 84,
+    "taille_px": 80,
     "casse": "majuscules",
     "gras": true
   },
@@ -36,8 +36,8 @@
   },
   "mise_en_page": {
     "centre_x_px": 540,
-    "centre_bloc_y_px": 1450,
-    "largeur_max_px": 900,
+    "centre_bloc_y_px": 1380,
+    "largeur_max_px": 840,
     "lignes_max": 2,
     "mots_max_par_bloc": 3,
     "interligne": 1.0
@@ -56,5 +56,26 @@
     "emojis": false,
     "ponctuation": true
   },
-  "glossaire": []
+  "glossaire": [],
+  "format": "mobile_9_16",
+  "zone_sure": {
+    "haut_px": 250,
+    "bas_px": 420,
+    "cotes_px": 120
+  },
+  "impact": {
+    "effets_autorises": [
+      "gras",
+      "agrandi"
+    ],
+    "effets_defaut": [
+      "agrandi"
+    ],
+    "echelle": 1.3,
+    "police_gras": {
+      "famille": "Inter Black",
+      "b": 0
+    }
+  },
+  "mesure_exacte": true
 }

@@ -123,6 +123,64 @@ def largeur_estimee(texte, taille):
     return len(texte) * taille * 0.52
 
 
+_DOSSIER_POLICES = "fonts"
+_MESURES = {}
+
+
+def police_mesure(style):
+    """Fichier de police du style (pour mesurer le texte), ou None."""
+    p = style["police"]
+    candidats = []
+    if p.get("fichier"):
+        candidats.append(os.path.basename(p["fichier"]))
+    candidats.append(f"{p['famille'].replace(' ', '')}-{p.get('graisse', 'Regular')}.otf")
+    for nom in candidats:
+        f = os.path.join(_DOSSIER_POLICES, nom)
+        if os.path.exists(f):
+            return f
+    return None
+
+
+def mesurer(texte, style):
+    """Largeur reelle (px de la grille du style) d'un texte avec la police du style, ou None si impossible."""
+    f = police_mesure(style)
+    if not f:
+        return None
+    cle = (f, taille_ass(style["police"]))
+    if cle not in _MESURES:
+        from PIL import ImageFont
+        ft = ImageFont.truetype(f, 200)
+        asc, desc = ft.getmetrics()
+        _MESURES[cle] = (ft, taille_ass(style["police"]) / ((asc + desc) / 200) / 200)   # px par unite de ft.getlength
+    ft, k = _MESURES[cle]
+    return ft.getlength(texte) * k
+
+
+def largeur_ligne(mots, style, taille):
+    """Largeur d'une ligne : mesure reelle si le style le demande (mesure_exacte), sinon estimation historique."""
+    if style.get("mesure_exacte") and police_mesure(style):
+        maj = style["police"].get("casse") == "majuscules"
+        total = 0.0
+        for i, w in enumerate(mots):
+            texte = w["mot"].upper() if (maj or "capitales" in (w.get("impact") or [])) else w["mot"]
+            facteur = w.get("impact_echelle", 1.0) if w.get("impact") else (style["mots_cles"]["echelle"] if w.get("cle") else 1.0)
+            if "gras" in (w.get("impact") or []):
+                facteur *= 1.05
+            total += (mesurer(texte, style) or 0) * facteur
+            if i:
+                total += (mesurer(" ", style) or 0)
+        return total
+    return largeur_mots(mots, taille)
+
+
+def largeur_mots(mots, taille):
+    """Largeur estimee d'une suite de mots ; un mot mis en impact (agrandi, capitales) compte plus large."""
+    total = 0.0
+    for i, w in enumerate(mots):
+        total += (len(w["mot"]) + (1 if i else 0)) * taille * 0.52 * w.get("facteur_largeur", 1.0)
+    return total
+
+
 def peut_couper_apres(mot):
     m = normaliser(mot["mot"]).split()
     return not (m and m[-1] in NO_CUT_AFTER)
@@ -180,15 +238,14 @@ def repartir_lignes(bloc, style):
     """Retourne une liste de lignes (listes de mots) : 1 ligne si ca tient, sinon coupe equilibree."""
     ml = style["mise_en_page"]
     taille = taille_em(style["police"]) * 1.056  # = ancien 66 : decoupes inchangees
-    texte = " ".join(w["mot"] for w in bloc)
-    if ml["lignes_max"] < 2 or len(bloc) < 2 or largeur_estimee(texte, taille) <= ml["largeur_max_px"]:
+    if ml["lignes_max"] < 2 or len(bloc) < 2 or largeur_ligne(bloc, style, taille) <= ml["largeur_max_px"]:
         return [bloc]
     meilleur, score = None, None
     for k in range(1, len(bloc)):
         if not peut_couper_apres(bloc[k - 1]):
             continue
-        a = largeur_estimee(" ".join(w["mot"] for w in bloc[:k]), taille)
-        b = largeur_estimee(" ".join(w["mot"] for w in bloc[k:]), taille)
+        a = largeur_ligne(bloc[:k], style, taille)
+        b = largeur_ligne(bloc[k:], style, taille)
         s = max(a, b)
         if score is None or s < score:
             meilleur, score = k, s
@@ -259,8 +316,91 @@ def limiter_mots_cles(blocs, style):
                         w["cle"] = "principal"
 
 
+# ---------- gamme « animation » : impact ----------
+# Un mot ou une courte phrase peut etre mis en impact par-dessus le style de la marque : meme police que le
+# texte de la marque et sa couleur de marque, avec en plus gras, agrandi et/ou capitales.
+# Les reglages viennent de la table Supabase Animations (defauts) puis de Clients.style.impact (par marque).
+IMPACT_DEFAUT = {
+    "effets_autorises": ["gras", "agrandi", "capitales"],
+    "effets_defaut": ["agrandi"],
+    "echelle": 1.3,            # taille d'un mot « agrandi » par rapport au texte
+    "couleur": "marque",       # "marque" = couleurs.mot_cle_accent du style, ou un #RRGGBB
+    "animation": "pop",        # "pop" (petit coup d'echelle quand le mot est dit) ou "aucune"
+    "duree_ms": 140,
+    "max_par_bloc": 1,         # nombre de passages en impact par sous-titre
+}
+EFFETS_IMPACT = ("gras", "agrandi", "capitales")
+
+
+def reglages_impact(style):
+    cfg = dict(IMPACT_DEFAUT)
+    cfg.update(style.get("impact") or {})
+    return cfg
+
+
+def effets_impact(demandes, cfg):
+    """Effets demandes par l'IA, limites a ceux que la marque autorise ; effets par defaut si rien de valide."""
+    autorises = [e for e in EFFETS_IMPACT if e in (cfg.get("effets_autorises") or [])]
+    voulus = [e for e in EFFETS_IMPACT if e in (demandes or []) and e in autorises]
+    if not voulus:
+        voulus = [e for e in (cfg.get("effets_defaut") or []) if e in autorises]
+    return voulus
+
+
+def couleur_impact(style, cfg):
+    c = cfg.get("couleur")
+    if isinstance(c, str) and c.startswith("#"):
+        return c
+    return style["couleurs"].get("mot_cle_accent") or style["couleurs"]["texte"]
+
+
+def limiter_impact(blocs, style):
+    """Garde au plus max_par_bloc passages en impact par bloc (les premiers) ; un mot en impact n'est plus un mot cle."""
+    cfg = reglages_impact(style)
+    maxi = int(cfg.get("max_par_bloc", 1))
+    for b in blocs:
+        groupes = []
+        for w in b["mots"]:
+            if w.get("impact"):
+                g = w.get("impact_groupe", 0)
+                if g not in groupes:
+                    groupes.append(g)
+        gardes = set(groupes[:maxi])
+        for w in b["mots"]:
+            if w.get("impact") and w.get("impact_groupe", 0) not in gardes:
+                w.pop("impact", None)
+                w.pop("impact_groupe", None)
+            if w.get("impact"):
+                w["cle"] = None
+
+
+def preparer_impact_ligne(ligne, style, taille):
+    """Fixe l'echelle et le poids de largeur des mots en impact d'une ligne ; reduit l'agrandissement si la ligne deborde."""
+    cfg = reglages_impact(style)
+    casse_maj = style["police"].get("casse") == "majuscules"
+    for w in ligne:
+        eff = w.get("impact")
+        if not eff:
+            w["impact_echelle"] = 1.0
+            w["facteur_largeur"] = 1.0
+            continue
+        w["impact_echelle"] = float(cfg.get("echelle", 1.3)) if "agrandi" in eff else 1.0
+        w["facteur_largeur"] = w["impact_echelle"] * (1.2 if "capitales" in eff and not casse_maj else 1.0) * (1.05 if "gras" in eff else 1.0)
+    largeur = largeur_ligne(ligne, style, taille)
+    maxi = style["mise_en_page"]["largeur_max_px"]
+    if largeur > maxi:
+        exces = largeur / maxi
+        for w in ligne:
+            if w.get("impact") and w["impact_echelle"] > 1.0:
+                reduit = max(1.0, w["impact_echelle"] / exces)
+                w["facteur_largeur"] *= reduit / w["impact_echelle"]
+                w["impact_echelle"] = reduit
+
+
 # ---------- sortie ASS ----------
 def generer_ass(blocs, style, largeur, hauteur, nom_police, titres=None, dossier_polices="fonts"):
+    global _DOSSIER_POLICES
+    _DOSSIER_POLICES = dossier_polices
     k = hauteur / style["resolution"][1]          # echelle verticale
     kx = largeur / style["resolution"][0]
     p, c, ml, an, ombre = style["police"], style["couleurs"], style["mise_en_page"], style["animation"], style["ombre"]
@@ -276,8 +416,10 @@ def generer_ass(blocs, style, largeur, hauteur, nom_police, titres=None, dossier
         decalage = ombre.get("decalage_px", 2) * k
         alpha_ombre = int(round((1 - ombre.get("opacite", 0.6)) * 255))
         back = couleur_ass(ombre.get("couleur", "#000000"), alpha_ombre)
+        a_ombre = f"&H{alpha_ombre:02X}&"
     else:
         decalage, back = 0, couleur_ass("#000000", 255)
+        a_ombre = "&HFF&"
 
     entete = f"""[Script Info]
 ScriptType: v4.00+
@@ -296,11 +438,21 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     lignes = []
     for b in blocs:
         b0 = b["debut"]
+        for w in b["mots"]:
+            w.setdefault("facteur_largeur", 1.0)
+        taille_calc = taille_em(style["police"]) * 1.056
+        for w in b["mots"]:      # 1re estimation de largeur (avant le decoupage en lignes)
+            preparer_impact_ligne([w], dict(style, mise_en_page=dict(ml, largeur_max_px=10 ** 6)), taille_calc)
         mise_en_page = repartir_lignes(b["mots"], style)
         morceaux, echelles = [], []
+        reduction = 1.0      # styles « mesure_exacte » : le bloc est reduit (70 % au plus) s'il deborde encore
+        for ligne in mise_en_page:
+            preparer_impact_ligne(ligne, style, taille_calc)
+            if style.get("mesure_exacte"):
+                reduction = min(reduction, max(0.7, ml["largeur_max_px"] / max(largeur_ligne(ligne, style, taille_calc), 1)))
         for ligne in mise_en_page:
             parts = []
-            echelles.append(max([style["mots_cles"]["echelle"] if w.get("cle") else 1 for w in ligne]))
+            echelles.append(reduction * max([(w.get("impact_echelle", 1.0) if w.get("impact") else (style["mots_cles"]["echelle"] if w.get("cle") else 1)) for w in ligne]))
             for w in ligne:
                 texte = w["mot"].upper() if p.get("casse") == "majuscules" else w["mot"]
                 texte = texte.replace("{", "(").replace("}", ")")
@@ -310,27 +462,46 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 a = int(max(0, (w["debut"] - b0) * 1000))
                 fin_mot = int(max(a + 1, (min(w["fin"], b["fin"]) - b0) * 1000))
                 cle = w.get("cle")
+                imp = w.get("impact")
                 col = c["texte"]
                 echelle = 100
                 if cle:
                     col = c.get("mot_cle_" + cle, c["mot_cle_principal"])
                     echelle = int(round(style["mots_cles"]["echelle"] * 100))
+                police_impact = ""
+                if imp:      # impact : couleur de marque ; agrandi / capitales / gras selon les effets
+                    cfg = reglages_impact(style)
+                    col = couleur_impact(style, cfg)
+                    echelle = int(round(100 * w.get("impact_echelle", 1.0)))
+                    if "capitales" in imp:
+                        texte = texte.upper()
+                    if "gras" in imp:
+                        pg = cfg.get("police_gras") or {}
+                        police_impact = f"\\fn{pg.get('famille') or nom_police}\\b{pg.get('b', 1)}"
+                echelle = int(round(echelle * reduction))
                 tags = f"\\1c{couleur_ass(col)}\\fscx{echelle}\\fscy{echelle}"
-                if p.get("famille_mot_cle"):   # mot cle en gras (police dediee) seulement si mots_cles.gras ; sinon meme police
+                if p.get("famille_mot_cle") and not imp:   # mot cle en gras (police dediee) seulement si mots_cles.gras ; sinon meme police
                     if cle and style["mots_cles"].get("gras", True):
                         tags += f"\\fn{p['famille_mot_cle']}\\b1"
                     else:
                         tags += f"\\fn{nom_police}\\b{abs(gras)}"
                 if mode == "progressive":
-                    tags += f"\\1a&HFF&\\t({a},{a + fade},\\1a&H00&)"
+                    tags += f"\\1a&HFF&\\3a&HFF&\\4a&HFF&\\t({a},{a + fade},\\1a&H00&\\3a&H00&\\4a{a_ombre})"
                 elif mode == "pop":
-                    tags = (f"\\1c{couleur_ass(col)}\\1a&HFF&\\fscx{int(echelle * .6)}\\fscy{int(echelle * .6)}"
-                            f"\\t({a},{a + 1},\\1a&H00&)\\t({a},{a + fade + 60},\\fscx{echelle}\\fscy{echelle})")
+                    tags = (f"\\1c{couleur_ass(col)}\\1a&HFF&\\3a&HFF&\\4a&HFF&\\fscx{int(echelle * .6)}\\fscy{int(echelle * .6)}"
+                            f"\\t({a},{a + 1},\\1a&H00&\\3a&H00&\\4a{a_ombre})\\t({a},{a + fade + 60},\\fscx{echelle}\\fscy{echelle})")
                 elif mode == "karaoke":
                     inactif = couleur_ass(c.get("texte_inactif", c["texte"]))
-                    actif = couleur_ass(c.get("mot_cle_accent", "#FFD400") if cle else c["texte"])
+                    actif = couleur_ass(col if imp else (c.get("mot_cle_accent", "#FFD400") if cle else c["texte"]))
                     tags = (f"\\1c{inactif}\\fscx{echelle}\\fscy{echelle}"
                             f"\\t({a},{a + 1},\\1c{actif})\\t({fin_mot},{fin_mot + 1},\\1c{inactif})")
+                if imp:
+                    tags += police_impact
+                    if reglages_impact(style).get("animation") == "pop" and mode in ("statique", "progressive"):
+                        d = int(reglages_impact(style).get("duree_ms", 140))
+                        bump = int(echelle * 1.15)
+                        tags += (f"\\t({a},{a + d // 2},\\fscx{bump}\\fscy{bump})"
+                                 f"\\t({a + d // 2},{a + d},\\fscx{echelle}\\fscy{echelle})")
                 parts.append("{" + tags + "}" + texte)
             morceaux.append(" ".join(parts))
         if ml.get("ancrage") == "premiere_ligne" and "baseline_ligne1_y_px" in ml:
@@ -414,5 +585,6 @@ def construire_blocs(mots, style):
         for m in mots:
             m["mot"] = re.sub(r"[.,;:!?…]+$", "", m["mot"])
     blocs = horodater(decouper(mots, style))
+    limiter_impact(blocs, style)
     limiter_mots_cles(blocs, style)
     return blocs
