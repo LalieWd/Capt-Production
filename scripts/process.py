@@ -76,7 +76,7 @@ def charger_clients_supabase():
     en_tetes = {"apikey": cle, "User-Agent": "capt-sous-titres/1.0"}
     if cle.startswith("eyJ"):          # ancienne cle JWT ; les nouvelles cles (sb_secret_...) n'ont que apikey
         en_tetes["Authorization"] = f"Bearer {cle}"
-    req = urllib.request.Request(url.rstrip("/") + "/rest/v1/clients?select=id,menu_label,code,alias,actif,style,glossaire&actif=eq.true",
+    req = urllib.request.Request(url.rstrip("/") + "/rest/v1/Clients?select=id,menu_label,code,alias,actif,style,glossaire&actif=eq.true",
                                  headers=en_tetes)
     try:
         lignes = json.loads(urllib.request.urlopen(req, timeout=30).read())
