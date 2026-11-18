@@ -135,7 +135,7 @@ jobs:
           CLIENT: ${{ inputs.client || inputs.client_code }}
           STYLE: ${{ inputs.style }}      # en mode n8n : ajustements de style en JSON
           SUBS: ${{ inputs.subs }}
-        run: python3 process.py video.mp4 "$VIDEO_NAME" "$CLIENT" out "$STYLE"
+        run: python3 scripts/process.py video.mp4 "$VIDEO_NAME" "$CLIENT" out "$STYLE"
 
       - name: Garder les fichiers
         uses: actions/upload-artifact@v4
