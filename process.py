@@ -409,7 +409,186 @@ def main(video, nom_video, client_saisi, sortie, style_choisi=""):
     print(f"{len(blocs)} blocs, {len(rapport['corrections'])} corrections, {len(rapport['doutes'])} doutes, style {fichier_style}")
 
 
+# ---------------------------------------------------------------------------
+# Mode n8n en deux phases (variable d'environnement PHASE)
+#   PHASE=transcription : audio -> Whisper -> out/mots.json (aucune correction : l'agent n8n s'en charge)
+#   PHASE=render        : SUBS (json des sous-titres valides par n8n) + style -> video sous-titree,
+#                         out/subtitles.srt, out/capture_1..6.jpg, out/subs_used.json, out/errors.txt
+# Sans PHASE, le fonctionnement historique (main) est inchange.
+# ---------------------------------------------------------------------------
+def fusion_profonde(base, ajout):
+    """Copie de base ou les cles de ajout (dict imbriques compris) sont appliquees par-dessus."""
+    res = dict(base)
+    for k, v in (ajout or {}).items():
+        if isinstance(v, dict) and isinstance(res.get(k), dict):
+            res[k] = fusion_profonde(res[k], v)
+        else:
+            res[k] = v
+    return res
+
+
+def resoudre_style(client_saisi, nom_video):
+    """Style du client : Supabase d'abord, sinon fichiers locaux. Retourne (style, nom_client, fichier_style, alias, alertes)."""
+    alertes = []
+    lignes, err_sb = charger_clients_supabase()
+    if lignes is not None:
+        ligne, alias, erreur, inconnu = choisir_ligne(lignes, client_saisi, nom_video, "")
+        if erreur:
+            raise ValueError(erreur)
+        style = style_depuis_ligne(ligne)
+        nom = None if inconnu else (style.get("client") or ligne["menu_label"])
+        if inconnu:
+            alertes.append("client non reconnu : style par defaut utilise")
+        return style, nom, ligne["menu_label"], alias, alertes
+    nom, fichier_style, alias, erreur = render.choisir_style(os.path.join(RACINE, "clients.json"), f"{nom_video} {client_saisi}")
+    if erreur:
+        raise ValueError(erreur)
+    style = json.load(open(os.path.join(DOSSIER_STYLES, fichier_style + ".json"), encoding="utf-8"))
+    alertes.append(f"{err_sb} : styles locaux utilises")
+    return style, nom, fichier_style, alias, alertes
+
+
+def resoudre_police(style, alertes):
+    """Nom de police a utiliser dans l'ASS ; ajoute une alerte si la police du client est absente."""
+    p = style["police"]
+    fichier_police, alternatif = p.get("fichier"), p.get("fichier_alternatif")
+    if trouver_police(fichier_police):
+        return p["famille"] + (f" {p['graisse']}" if p.get("graisse") and p["graisse"] not in ("Regular", "Bold") else "")
+    if trouver_police(alternatif):
+        alertes.append(f"police {p['famille']} {p.get('graisse', '')} absente : version de remplacement utilisee ({os.path.basename(alternatif)}), a verifier avec le client")
+        return p["famille"]
+    nom_police = p.get("fallback", "Inter")
+    if fichier_police:
+        alertes.append(f"police du client absente ({fichier_police}) : police de remplacement « {nom_police} » utilisee")
+    return nom_police
+
+
+def phase_transcription(video, sortie):
+    os.makedirs(sortie, exist_ok=True)
+    if os.environ.get("MOTS_JSON"):                      # option de test : saute Whisper
+        mots = json.load(open(os.environ["MOTS_JSON"], encoding="utf-8"))
+        duree = None
+    else:
+        audio = os.path.join(sortie, "audio.mp3")
+        extract_audio(video, audio)
+        resp = transcribe(audio)
+        mots = [{"word": w["word"].strip(), "start": round(w["start"], 2), "end": round(w["end"], 2)}
+                for w in resp.get("words", []) if w["word"].strip()]
+        duree = resp.get("duration")
+    if not mots:
+        raise ValueError("transcription vide : aucun mot detecte dans l'audio")
+    json.dump(mots, open(os.path.join(sortie, "mots.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    json.dump({"statut": "ok", "phase": "transcription", "mots": len(mots), "duration": duree},
+              open(os.path.join(sortie, "report.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    print(f"transcription : {len(mots)} mots")
+
+
+def blocs_depuis_subs(subs, style):
+    """Transforme les sous-titres de n8n [{start, end, text, highlight?}] en blocs pour render (mots chronometres)."""
+    blocs = []
+    for s in sorted(subs, key=lambda x: float(x["start"])):
+        texte = " ".join(str(s.get("text", "")).split())
+        if not texte:
+            continue
+        debut, fin = float(s["start"]), float(s["end"])
+        if fin <= debut:
+            fin = debut + render.MIN_DUREE
+        jetons = texte.split(" ")
+        poids = [max(len(j), 1) for j in jetons]
+        total, t0, mots = sum(poids), debut, []
+        for jeton, p in zip(jetons, poids):
+            t1 = t0 + (fin - debut) * p / total
+            mots.append({"mot": jeton, "debut": t0, "fin": t1, "cle": None})
+            t0 = t1
+        surligner = {m for h in (s.get("highlight") or []) for m in render.normaliser(str(h)).split()}
+        for m in mots:
+            if render.normaliser(m["mot"]) in surligner:
+                m["cle"] = "principal"
+        blocs.append({"debut": debut, "fin": fin, "mots": mots})
+    for prev, cur in zip(blocs, blocs[1:]):               # jamais de chevauchement
+        if cur["debut"] < prev["fin"] + 0.02:
+            prev["fin"] = max(prev["debut"] + 0.1, cur["debut"] - 0.02)
+    if not style.get("contenu", {}).get("ponctuation", True):
+        for b in blocs:
+            for m in b["mots"]:
+                m["mot"] = re.sub(r"[.,;:!?…]+$", "", m["mot"])
+    render.limiter_mots_cles(blocs, style)
+    return blocs
+
+
+def captures(video, blocs, sortie, n=6):
+    """Jusqu'a n images de la video rendue, prises au milieu de blocs repartis sur la duree."""
+    if not blocs:
+        return 0
+    idx = sorted({round(i * (len(blocs) - 1) / max(n - 1, 1)) for i in range(n)}) if len(blocs) > 1 else [0]
+    for k, i in enumerate(idx, 1):
+        t = (blocs[i]["debut"] + blocs[i]["fin"]) / 2
+        subprocess.run(["ffmpeg", "-y", "-ss", f"{t:.2f}", "-i", video, "-frames:v", "1", "-vf", "scale=540:-2",
+                        "-q:v", "4", os.path.join(sortie, f"capture_{k}.jpg")], check=True, capture_output=True)
+    return len(idx)
+
+
+def phase_rendu(video, nom_video, client_saisi, sortie, subs_json, style_json):
+    os.makedirs(sortie, exist_ok=True)
+    subs = json.loads(subs_json) if subs_json and subs_json.strip() else []
+    if not isinstance(subs, list) or not subs:
+        raise ValueError("subs vide : aucun sous-titre a incruster")
+    ajustements = json.loads(style_json) if style_json and style_json.strip().startswith("{") else {}
+    json.dump(subs, open(os.path.join(sortie, "subs_used.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    json.dump(ajustements, open(os.path.join(sortie, "style_input.json"), "w", encoding="utf-8"), ensure_ascii=False)
+
+    style, nom, fichier_style, alias, alertes = resoudre_style(client_saisi, nom_video)
+    style = fusion_profonde(style, ajustements)
+    nom_police = resoudre_police(style, alertes)
+
+    largeur, hauteur = dimensions(video)
+    if largeur > style["resolution"][0]:
+        hauteur = int(round(hauteur * style["resolution"][0] / largeur / 2) * 2)
+        largeur = style["resolution"][0]
+    blocs = blocs_depuis_subs(subs, style)
+    ass = render.generer_ass(blocs, style, largeur, hauteur, nom_police, [], DOSSIER_POLICES)
+    open(os.path.join(sortie, "subtitles.ass"), "w", encoding="utf-8").write(ass)
+    open(os.path.join(sortie, "subtitles.srt"), "w", encoding="utf-8").write(render.generer_srt(blocs))
+
+    sortie_mp4 = os.path.join(sortie, "subtitled.mp4")
+    filtre = f"scale={largeur}:{hauteur},ass={os.path.join(sortie, 'subtitles.ass')}:fontsdir={DOSSIER_POLICES}"
+    subprocess.run(["ffmpeg", "-y", "-i", video, "-vf", filtre, "-c:v", "libx264", "-preset", "veryfast",
+                    "-crf", "24", "-pix_fmt", "yuv420p", "-c:a", "copy", sortie_mp4], check=True, capture_output=True)
+    n_captures = captures(sortie_mp4, blocs, sortie)
+
+    rapport = {"statut": "ok_avec_alertes" if alertes else "ok", "phase": "render", "client": nom or client_saisi or "",
+               "style": fichier_style, "alias_detecte": alias, "alertes": alertes, "subtitles": len(blocs),
+               "captures": n_captures, "ajustements_style": ajustements}
+    json.dump(rapport, open(os.path.join(sortie, "report.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    open(os.path.join(sortie, "errors.txt"), "w", encoding="utf-8").write("; ".join(alertes))
+    print(f"rendu : {len(blocs)} blocs, {n_captures} captures, style {fichier_style}")
+
+
+def lancer_phase(phase, argv):
+    video, nom_video, client_saisi, sortie = argv[0], argv[1], argv[2], argv[3]
+    reste = argv[4] if len(argv) > 4 else ""                  # en mode n8n : ajustements de style (JSON)
+    try:
+        if phase == "transcription":
+            phase_transcription(video, sortie)
+        elif phase == "render":
+            phase_rendu(video, nom_video, client_saisi, sortie, os.environ.get("SUBS", ""), reste)
+        else:
+            raise ValueError(f"phase inconnue : {phase}")
+    except Exception as e:                                    # le workflow lit report.json pour prevenir n8n
+        os.makedirs(sortie, exist_ok=True)
+        raison = f"{type(e).__name__} : {e}"
+        if isinstance(e, subprocess.CalledProcessError) and e.stderr:
+            raison += " | " + str(e.stderr)[-400:]
+        json.dump({"statut": "erreur", "phase": phase, "raison": raison},
+                  open(os.path.join(sortie, "report.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        print("ERREUR :", raison)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     if len(sys.argv) not in (5, 6):
         sys.exit(__doc__)
-    main(*sys.argv[1:6])
+    if os.environ.get("PHASE", "").strip():
+        lancer_phase(os.environ["PHASE"].strip(), sys.argv[1:])
+    else:
+        main(*sys.argv[1:6])
