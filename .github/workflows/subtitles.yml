@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       video_path:
-        description: "Chemin d'une video deja dans le depot (ex. inputs/test.mp4)"
+        description: "Chemin d'une video deja dans le depot (test manuel)"
         required: false
         default: ""
       video_url:

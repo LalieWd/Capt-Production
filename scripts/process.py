@@ -76,7 +76,7 @@ def charger_clients_supabase():
     en_tetes = {"apikey": cle, "User-Agent": "capt-sous-titres/1.0"}
     if cle.startswith("eyJ"):          # ancienne cle JWT ; les nouvelles cles (sb_secret_...) n'ont que apikey
         en_tetes["Authorization"] = f"Bearer {cle}"
-    req = urllib.request.Request(url.rstrip("/") + "/rest/v1/clients?select=id,menu_label,code,alias,actif,style,glossaire&actif=eq.true",
+    req = urllib.request.Request(url.rstrip("/") + "/rest/v1/Clients?select=id,menu_label,code,alias,actif,style,glossaire&actif=eq.true",
                                  headers=en_tetes)
     try:
         lignes = json.loads(urllib.request.urlopen(req, timeout=30).read())
@@ -85,6 +85,48 @@ def charger_clients_supabase():
     if not lignes:
         return None, "table clients vide"
     return lignes, None
+
+
+def ligne_defaut(lignes):
+    """Ligne « Par defaut » de la table Clients : style de repli quand la marque est inconnue ou inutilisable."""
+    return next((l for l in lignes if (l.get("code") or "").lower() == "default"
+                 or render.normaliser(l.get("menu_label", "")) == "par defaut"), None)
+
+
+CLES_STYLE = {
+    "police": ("famille",),
+    "couleurs": ("texte", "mot_cle_principal"),
+    "mise_en_page": ("centre_x_px", "centre_bloc_y_px", "largeur_max_px", "lignes_max", "mots_max_par_bloc"),
+    "animation": (),
+    "ombre": (),
+    "mots_cles": ("echelle",),
+}
+
+
+def style_inutilisable(style):
+    """None si le style a tout ce dont render.py a besoin ; sinon la raison (texte court)."""
+    if not isinstance(style, dict):
+        return "style absent"
+    for bloc, cles in CLES_STYLE.items():
+        b = style.get(bloc)
+        if not isinstance(b, dict):
+            return f"bloc {bloc} manquant"
+        for k in cles:
+            if k not in b:
+                return f"{bloc}.{k} manquant"
+    p = style["police"]
+    if "taille_px" not in p and "taille_em_px" not in p:
+        return "police.taille_px manquant"
+    res = style.get("resolution")
+    if not (isinstance(res, list) and len(res) == 2 and all(isinstance(x, (int, float)) and x > 0 for x in res)):
+        return "resolution invalide"
+    ml = style["mise_en_page"]
+    if not all(isinstance(ml[k], (int, float)) and ml[k] > 0 for k in ("largeur_max_px", "lignes_max", "mots_max_par_bloc")):
+        return "mise_en_page invalide"
+    ct = style.get("contour")
+    if ct is not None and not (isinstance(ct, dict) and "epaisseur_px" in ct and "couleur" in ct):
+        return "contour invalide"
+    return None
 
 
 def choisir_ligne(lignes, client_saisi, nom_video, style_choisi):
@@ -112,7 +154,7 @@ def choisir_ligne(lignes, client_saisi, nom_video, style_choisi):
     if len(trouves) == 1:
         l, alias = next(iter(trouves.values()))
         return l, alias, None, False
-    defaut = next((l for l in lignes if render.normaliser(l["menu_label"]) == "par defaut"), None)
+    defaut = ligne_defaut(lignes)
     if defaut:
         return defaut, None, None, True
     return None, None, f"client non reconnu : {nom_video}", False
@@ -427,23 +469,66 @@ def fusion_profonde(base, ajout):
     return res
 
 
+def charger_animations_supabase():
+    """Gamme « animation » (table Animations) : {code: effets}. Vide si injoignable : render.py a ses valeurs par defaut."""
+    url, cle = os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY")
+    if not url or not cle:
+        return {}
+    en_tetes = {"apikey": cle, "User-Agent": "capt-sous-titres/1.0"}
+    if cle.startswith("eyJ"):
+        en_tetes["Authorization"] = f"Bearer {cle}"
+    req = urllib.request.Request(url.rstrip("/") + "/rest/v1/Animations?select=code,effets&actif=eq.true", headers=en_tetes)
+    try:
+        return {l["code"]: l.get("effets") or {} for l in json.loads(urllib.request.urlopen(req, timeout=30).read())}
+    except Exception:
+        return {}
+
+
 def resoudre_style(client_saisi, nom_video):
-    """Style du client : Supabase d'abord, sinon fichiers locaux. Retourne (style, nom_client, fichier_style, alias, alertes)."""
+    """Style du client : Supabase d'abord, sinon fichiers locaux. Si la marque est inconnue, ambigue ou son style
+    inutilisable, le style « Par defaut » est applique. Retourne (style, nom_client, fichier_style, alias, alertes)."""
     alertes = []
     lignes, err_sb = charger_clients_supabase()
     if lignes is not None:
         ligne, alias, erreur, inconnu = choisir_ligne(lignes, client_saisi, nom_video, "")
-        if erreur:
-            raise ValueError(erreur)
+        client_inconnu = inconnu                             # aucune marque reconnue dans le nom
+        if erreur:                                           # ambigu / introuvable : on ne bloque pas, style par defaut
+            ligne = ligne_defaut(lignes)
+            if ligne is None:
+                raise ValueError(erreur)
+            alertes.append(f"{erreur} : style par defaut utilise")
+            alias, inconnu = None, True
         style = style_depuis_ligne(ligne)
-        nom = None if inconnu else (style.get("client") or ligne["menu_label"])
-        if inconnu:
+        raison = style_inutilisable(style)
+        if raison and not inconnu:                           # marque reconnue mais style casse
+            defaut = ligne_defaut(lignes)
+            if defaut is None:
+                raise ValueError(f"style de {ligne['menu_label']} inutilisable ({raison}) et pas de style par defaut")
+            alertes.append(f"style de {ligne['menu_label']} inutilisable ({raison}) : style par defaut utilise")
+            ligne, alias, inconnu = defaut, None, True
+            style = style_depuis_ligne(ligne)
+            raison = style_inutilisable(style)
+        if raison:
+            raise ValueError(f"style par defaut inutilisable ({raison})")
+        if client_inconnu and not erreur:
             alertes.append("client non reconnu : style par defaut utilise")
+        animations = charger_animations_supabase()
+        if animations.get("impact") is not None:
+            style["impact"] = fusion_profonde(animations["impact"], style.get("impact") or {})
+        nom = None if inconnu else (style.get("client") or ligne["menu_label"])
         return style, nom, ligne["menu_label"], alias, alertes
     nom, fichier_style, alias, erreur = render.choisir_style(os.path.join(RACINE, "clients.json"), f"{nom_video} {client_saisi}")
     if erreur:
         raise ValueError(erreur)
     style = json.load(open(os.path.join(DOSSIER_STYLES, fichier_style + ".json"), encoding="utf-8"))
+    raison = style_inutilisable(style)
+    if raison:
+        alertes.append(f"style {fichier_style} inutilisable ({raison}) : style par defaut utilise")
+        nom, fichier_style = None, "default"
+        style = json.load(open(os.path.join(DOSSIER_STYLES, "default.json"), encoding="utf-8"))
+        raison = style_inutilisable(style)
+        if raison:
+            raise ValueError(f"style par defaut inutilisable ({raison})")
     alertes.append(f"{err_sb} : styles locaux utilises")
     return style, nom, fichier_style, alias, alertes
 
@@ -483,9 +568,32 @@ def phase_transcription(video, sortie):
     print(f"transcription : {len(mots)} mots")
 
 
+def marquer_impact(mots, impact, cfg):
+    """Gamme « animation » : marque les mots d'un sous-titre a mettre en impact.
+    impact = [{"texte": "mots exacts du sous-titre", "effets": ["gras", "agrandi", "capitales"]}]"""
+    if not isinstance(impact, list):
+        return
+    normes = [render.normaliser(m["mot"]) for m in mots]
+    for k, entree in enumerate(impact[:6]):
+        if isinstance(entree, dict):
+            texte, demandes = str(entree.get("texte", "")), entree.get("effets")
+        else:
+            texte, demandes = str(entree), None
+        jetons = [render.normaliser(t) for t in texte.split()]
+        effets = render.effets_impact(demandes if isinstance(demandes, list) else [], cfg)
+        if not jetons or not effets:
+            continue
+        for i in range(len(normes) - len(jetons) + 1):
+            if normes[i:i + len(jetons)] == jetons and not any(m.get("impact") for m in mots[i:i + len(jetons)]):
+                for m in mots[i:i + len(jetons)]:
+                    m["impact"], m["impact_groupe"], m["cle"] = effets, k, None
+                break
+
+
 def blocs_depuis_subs(subs, style):
     """Transforme les sous-titres de n8n [{start, end, text, highlight?}] en blocs pour render (mots chronometres)."""
     blocs = []
+    cfg_impact = render.reglages_impact(style)
     for s in sorted(subs, key=lambda x: float(x["start"])):
         texte = " ".join(str(s.get("text", "")).split())
         if not texte:
@@ -504,6 +612,7 @@ def blocs_depuis_subs(subs, style):
         for m in mots:
             if render.normaliser(m["mot"]) in surligner:
                 m["cle"] = "principal"
+        marquer_impact(mots, s.get("impact"), cfg_impact)
         blocs.append({"debut": debut, "fin": fin, "mots": mots})
     for prev, cur in zip(blocs, blocs[1:]):               # jamais de chevauchement
         if cur["debut"] < prev["fin"] + 0.02:
@@ -512,6 +621,7 @@ def blocs_depuis_subs(subs, style):
         for b in blocs:
             for m in b["mots"]:
                 m["mot"] = re.sub(r"[.,;:!?…]+$", "", m["mot"])
+    render.limiter_impact(blocs, style)
     render.limiter_mots_cles(blocs, style)
     return blocs
 

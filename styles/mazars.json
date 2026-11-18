@@ -102,5 +102,20 @@
       "jamais": [],
       "note": "majuscule quand il s'agit de l'équipe ou du métier"
     }
-  ]
+  ],
+  "impact": {
+    "effets_autorises": [
+      "gras",
+      "agrandi"
+    ],
+    "effets_defaut": [
+      "gras",
+      "agrandi"
+    ],
+    "echelle": 1.35,
+    "police_gras": {
+      "famille": "Halyard Display",
+      "b": 1
+    }
+  }
 }
