@@ -2,7 +2,7 @@
   "client": "Genre : corporate (sobre, apparition progressive)",
   "code": "CORPORATE",
   "genre": "corporate",
-  "version": "1.0",
+  "version": "1.1",
   "resolution": [
     1080,
     1920
@@ -12,7 +12,7 @@
     "graisse": "Medium",
     "fichier": null,
     "fallback": "Inter Medium",
-    "taille_px": 60,
+    "taille_px": 64,
     "casse": "phrase",
     "gras": false
   },
@@ -33,8 +33,8 @@
   },
   "mise_en_page": {
     "centre_x_px": 540,
-    "centre_bloc_y_px": 1500,
-    "largeur_max_px": 860,
+    "centre_bloc_y_px": 1400,
+    "largeur_max_px": 840,
     "lignes_max": 2,
     "mots_max_par_bloc": 6,
     "interligne": 1.05
@@ -53,5 +53,26 @@
     "emojis": false,
     "ponctuation": true
   },
-  "glossaire": []
+  "glossaire": [],
+  "format": "mobile_9_16",
+  "zone_sure": {
+    "haut_px": 250,
+    "bas_px": 420,
+    "cotes_px": 120
+  },
+  "impact": {
+    "effets_autorises": [
+      "gras",
+      "agrandi"
+    ],
+    "effets_defaut": [
+      "agrandi"
+    ],
+    "echelle": 1.3,
+    "police_gras": {
+      "famille": "Inter",
+      "b": 1
+    }
+  },
+  "mesure_exacte": true
 }
