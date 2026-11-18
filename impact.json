@@ -1,0 +1,60 @@
+{
+  "client": "Genre : impact (TikTok punchy, majuscules, mots clés jaunes)",
+  "code": "IMPACT",
+  "genre": "impact",
+  "version": "1.0",
+  "resolution": [
+    1080,
+    1920
+  ],
+  "police": {
+    "famille": "Inter",
+    "graisse": "Bold",
+    "fichier": null,
+    "fallback": "Inter",
+    "taille_px": 84,
+    "casse": "majuscules",
+    "gras": true
+  },
+  "couleurs": {
+    "texte": "#FFFFFF",
+    "texte_inactif": "#FFFFFF",
+    "mot_cle_principal": "#FFFFFF",
+    "mot_cle_secondaire": "#FFFFFF",
+    "mot_cle_accent": "#FFD400"
+  },
+  "contour": {
+    "couleur": "#000000",
+    "epaisseur_px": 8
+  },
+  "ombre": {
+    "active": false,
+    "couleur": "#000000",
+    "opacite": 0.6,
+    "decalage_px": 2,
+    "flou_px": 2
+  },
+  "mise_en_page": {
+    "centre_x_px": 540,
+    "centre_bloc_y_px": 1450,
+    "largeur_max_px": 900,
+    "lignes_max": 2,
+    "mots_max_par_bloc": 3,
+    "interligne": 1.0
+  },
+  "mots_cles": {
+    "actif": true,
+    "echelle": 1.25,
+    "max_par_bloc": 1,
+    "frequence": "environ 1 bloc sur 2"
+  },
+  "animation": {
+    "mode": "pop",
+    "duree_fade_ms": 80
+  },
+  "contenu": {
+    "emojis": false,
+    "ponctuation": true
+  },
+  "glossaire": []
+}

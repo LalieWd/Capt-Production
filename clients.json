@@ -1,0 +1,17 @@
+{
+  "_aide": "Un client par entrée. 'alias' = ce qui peut apparaître dans le nom de la vidéo ou le champ Client, en minuscules sans accents. 'style' = fichier dans styles/. Pour ajouter un client : une entrée ici + un fichier styles/<nom>.json (ou réutiliser un genre : corporate, impact, karaoke, default).",
+  "si_client_inconnu": "defaut",
+  "defaut": "default",
+  "clients": [
+    {
+      "nom": "Forvis Mazars",
+      "style": "mazars",
+      "alias": [
+        "forvis mazars",
+        "forvismazars",
+        "forvis",
+        "mazars"
+      ]
+    }
+  ]
+}

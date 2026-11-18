@@ -1,0 +1,57 @@
+{
+  "client": "Genre : corporate (sobre, apparition progressive)",
+  "code": "CORPORATE",
+  "genre": "corporate",
+  "version": "1.0",
+  "resolution": [
+    1080,
+    1920
+  ],
+  "police": {
+    "famille": "Inter",
+    "graisse": "Medium",
+    "fichier": null,
+    "fallback": "Inter Medium",
+    "taille_px": 60,
+    "casse": "phrase",
+    "gras": false
+  },
+  "couleurs": {
+    "texte": "#FFFFFF",
+    "texte_inactif": "#FFFFFF",
+    "mot_cle_principal": "#FFFFFF",
+    "mot_cle_secondaire": "#FFFFFF",
+    "mot_cle_accent": "#3070C8"
+  },
+  "contour": null,
+  "ombre": {
+    "active": true,
+    "couleur": "#000000",
+    "opacite": 0.6,
+    "decalage_px": 2,
+    "flou_px": 2
+  },
+  "mise_en_page": {
+    "centre_x_px": 540,
+    "centre_bloc_y_px": 1500,
+    "largeur_max_px": 860,
+    "lignes_max": 2,
+    "mots_max_par_bloc": 6,
+    "interligne": 1.05
+  },
+  "mots_cles": {
+    "actif": true,
+    "echelle": 1.3,
+    "max_par_bloc": 1,
+    "frequence": "environ 1 bloc sur 3"
+  },
+  "animation": {
+    "mode": "progressive",
+    "duree_fade_ms": 150
+  },
+  "contenu": {
+    "emojis": false,
+    "ponctuation": true
+  },
+  "glossaire": []
+}

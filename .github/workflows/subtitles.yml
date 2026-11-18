@@ -1,0 +1,179 @@
+name: Sous-titres
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_path:
+        description: "Chemin d'une video deja dans le depot (ex. inputs/test.mp4)"
+        required: false
+        default: ""
+      video_url:
+        description: "Lien de telechargement direct de la video"
+        required: false
+        default: ""
+      drive_file_id:
+        description: "Identifiant d'un fichier Google Drive (telechargement direct, videos lourdes)"
+        required: false
+        default: ""
+      job_id:
+        description: "Identifiant du job (table jobs de Supabase). Si rempli : mode jobs (envoi dans Supabase Storage + rappel de n8n)"
+        required: false
+        default: ""
+      revision:
+        description: "Numero de la version (0 = premiere, 1+ = apres commentaires)"
+        required: false
+        default: "0"
+      comments:
+        description: "Commentaires de la validation precedente (informatif)"
+        required: false
+        default: ""
+      client:
+        description: "Code ou nom du client"
+        required: false
+        default: ""
+      style:
+        description: "Style choisi dans le formulaire (vide ou Automatique = detection d'apres le nom)"
+        required: false
+        default: ""
+      video_name:
+        description: "Nom d'origine du fichier video (sert a choisir le style du client)"
+        required: false
+        default: ""
+      callback_url:
+        description: "Adresse a rappeler quand c'est fini (n8n)"
+        required: false
+        default: ""
+      resumeUrl:
+        description: "Ajoute automatiquement par le noeud GitHub de n8n"
+        required: false
+        default: ""
+      resumeFormUrl:
+        description: "Ajoute automatiquement par le noeud GitHub de n8n"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write   # connexion a Google sans cle (Workload Identity Federation)
+
+jobs:
+  subtitles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CALLBACK_URL: ${{ inputs.callback_url || inputs.resumeUrl || secrets.CAPT_CALLBACK_URL }}
+      JOB_ID: ${{ inputs.job_id }}
+      REVISION: ${{ inputs.revision }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer FFmpeg
+        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-inter fonts-dejavu-core
+
+      - name: Se connecter a Google (sans cle)
+        id: google
+        if: ${{ inputs.drive_file_id != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/59127381813/locations/global/workloadIdentityPools/capt-github/providers/github
+          service_account: capt-lecture-drive@project-8b78492b-1cda-4529-af3.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/drive.readonly
+
+      - name: Recuperer la video
+        env:
+          VIDEO_PATH: ${{ inputs.video_path }}
+          VIDEO_URL: ${{ inputs.video_url }}
+          DRIVE_FILE_ID: ${{ inputs.drive_file_id }}
+          GOOGLE_TOKEN: ${{ steps.google.outputs.access_token }}
+        run: |
+          if [ -n "$DRIVE_FILE_ID" ]; then
+            CODE=$(curl -sSL --retry 3 -w "%{http_code}" -H "Authorization: Bearer $GOOGLE_TOKEN" \
+              "https://www.googleapis.com/drive/v3/files/${DRIVE_FILE_ID}?alt=media&supportsAllDrives=true" -o video.mp4)
+            if [ "$CODE" != "200" ]; then echo "Telechargement Drive refuse (HTTP $CODE) :"; head -c 600 video.mp4; echo; exit 1; fi
+          elif [ -n "$VIDEO_PATH" ]; then
+            cp "$VIDEO_PATH" video.mp4
+          elif [ -n "$VIDEO_URL" ]; then
+            curl -fsSL "$VIDEO_URL" -o video.mp4
+          else
+            echo "Aucune video fournie (drive_file_id, video_path ou video_url)"; exit 1
+          fi
+          ls -la video.mp4
+
+      - name: Sous-titrer (transcription, correction, style, incrustation)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          VIDEO_NAME: ${{ inputs.video_name || inputs.video_path }}
+          CLIENT: ${{ inputs.client }}
+          STYLE: ${{ inputs.style }}
+        run: python3 process.py video.mp4 "$VIDEO_NAME" "$CLIENT" out "$STYLE"
+
+      - name: Garder les fichiers
+        uses: actions/upload-artifact@v4
+        with:
+          name: sous-titres
+          path: |
+            out/subtitled.mp4
+            out/subtitles.srt
+            out/subtitles.ass
+            out/report.json
+
+      - name: Envoyer le resultat dans Supabase Storage (mode jobs)
+        id: stockage
+        if: ${{ inputs.job_id != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          set -euo pipefail
+          AUTH=()
+          case "$SUPABASE_KEY" in eyJ*) AUTH=(-H "Authorization: Bearer $SUPABASE_KEY");; esac
+          envoyer() {   # $1 = fichier local, $2 = nom dans le bucket, $3 = type MIME ; ecrit l'URL signee (7 jours)
+            P="jobs/${JOB_ID}/v${REVISION}/$2"
+            curl -fsS -X POST "$SUPABASE_URL/storage/v1/object/sorties/$P" -H "apikey: $SUPABASE_KEY" "${AUTH[@]}" \
+              -H "Content-Type: $3" -H "x-upsert: true" --data-binary @"$1" > /dev/null
+            CHEMIN=$(curl -fsS -X POST "$SUPABASE_URL/storage/v1/object/sign/sorties/$P" -H "apikey: $SUPABASE_KEY" "${AUTH[@]}" \
+              -H "Content-Type: application/json" -d '{"expiresIn":604800}' | jq -r '.signedURL')
+            echo "$SUPABASE_URL/storage/v1$CHEMIN"
+          }
+          echo "mp4=$(envoyer out/subtitled.mp4 sous-titree.mp4 video/mp4)" >> "$GITHUB_OUTPUT"
+          echo "srt=$(envoyer out/subtitles.srt sous-titres.srt application/x-subrip)" >> "$GITHUB_OUTPUT"
+
+      - name: Prevenir n8n (mode jobs)
+        if: ${{ inputs.job_id != '' && env.CALLBACK_URL != '' }}
+        env:
+          MP4_URL: ${{ steps.stockage.outputs.mp4 }}
+          SRT_URL: ${{ steps.stockage.outputs.srt }}
+        run: |
+          jq -n --arg job_id "$JOB_ID" --arg revision "$REVISION" --arg run_url "$RUN_URL" --arg mp4 "$MP4_URL" --arg srt "$SRT_URL" \
+            --slurpfile rapport out/report.json \
+            '{status:"ok", job_id:$job_id, revision:$revision, run_url:$run_url, rapport:$rapport[0], files:{mp4:$mp4, srt:$srt}}' \
+            | curl -fsS -X POST -H "Content-Type: application/json" --data @- "$CALLBACK_URL"
+
+      - name: Prevenir n8n en cas d'echec (mode jobs)
+        if: ${{ failure() && inputs.job_id != '' && env.CALLBACK_URL != '' }}
+        run: |
+          RAISON=$( [ -f out/report.json ] && jq -r '.raison // "erreur pendant le traitement"' out/report.json || echo "erreur pendant le traitement" )
+          jq -n --arg job_id "$JOB_ID" --arg revision "$REVISION" --arg run_url "$RUN_URL" --arg raison "$RAISON" \
+            '{status:"crashed", job_id:$job_id, revision:$revision, run_url:$run_url, error:$raison}' \
+            | curl -fsS -X POST -H "Content-Type: application/json" --data @- "$CALLBACK_URL"
+
+      - name: Prevenir n8n (ancien mode)
+        if: ${{ inputs.job_id == '' && env.CALLBACK_URL != '' }}
+        env:
+          CLIENT: ${{ inputs.client }}
+        run: |
+          jq -n --arg client "$CLIENT" --arg run_url "$RUN_URL" --rawfile srt out/subtitles.srt --slurpfile report out/report.json \
+            '{status:"ok", client:$client, run_url:$run_url, srt:$srt, report:$report[0]}' \
+            | curl -fsS -X POST -H "Content-Type: application/json" --data @- "$CALLBACK_URL"
+
+      - name: Prevenir n8n en cas d'echec (ancien mode)
+        if: ${{ failure() && inputs.job_id == '' && env.CALLBACK_URL != '' }}
+        run: |
+          RAISON=$( [ -f out/report.json ] && jq -r '.raison // "erreur pendant le traitement"' out/report.json || echo "erreur pendant le traitement" )
+          jq -n --arg run_url "$RUN_URL" --arg raison "$RAISON" \
+            '{status:"error", run_url:$run_url, raison:$raison}' \
+            | curl -fsS -X POST -H "Content-Type: application/json" --data @- "$CALLBACK_URL"

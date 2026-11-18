@@ -1,0 +1,106 @@
+{
+  "client": "Forvis Mazars",
+  "code": "MAZARS",
+  "version": "1.1",
+  "resolution": [
+    1080,
+    1920
+  ],
+  "police": {
+    "famille": "Halyard Display",
+    "graisse": "Medium",
+    "fichier": "fonts/HalyardDisplay-Medium.otf",
+    "fallback": "Inter Medium",
+    "taille_px": 66,
+    "casse": "phrase",
+    "fichier_alternatif": "fonts/HalyardDisplay-Bold.otf",
+    "famille_mot_cle": "Halyard Display"
+  },
+  "couleurs": {
+    "texte": "#FFFFFF",
+    "mot_cle_principal": "#FFFFFF",
+    "mot_cle_secondaire": "#FFFFFF",
+    "mot_cle_accent": "#3070C8",
+    "fond_mot_cle": null
+  },
+  "contour": null,
+  "ombre": {
+    "active": true,
+    "taille": "small",
+    "couleur": "#000000",
+    "opacite": 0.4,
+    "decalage_px": 2,
+    "flou_px": 4
+  },
+  "mise_en_page": {
+    "alignement": "centre",
+    "centre_x_px": 540,
+    "centre_bloc_y_px": 1500,
+    "largeur_max_px": 860,
+    "lignes_max": 2,
+    "mots_max_par_bloc": 6,
+    "retour_ligne": true,
+    "interligne": 1.05
+  },
+  "mots_cles": {
+    "actif": true,
+    "echelle": 1.35,
+    "max_par_bloc": 1,
+    "frequence": "environ 1 bloc sur 3",
+    "rotation_couleurs": [
+      "mot_cle_principal",
+      "mot_cle_accent"
+    ],
+    "gras": true
+  },
+  "animation": {
+    "bloc": "aucune",
+    "mot": "fade_in",
+    "duree_fade_ms": 150,
+    "revelation": "progressive",
+    "mise_en_page_figee": true,
+    "mode": "progressive"
+  },
+  "contenu": {
+    "emojis": false,
+    "ponctuation": true,
+    "affichage_pendant_silences": true
+  },
+  "genre": "corporate",
+  "glossaire": [
+    {
+      "ecrire": "Forvis Mazars",
+      "jamais": [
+        "forvis-mazars",
+        "forvis mazar",
+        "forvismazars",
+        "forviz mazars",
+        "forvis mazarre"
+      ]
+    },
+    {
+      "ecrire": "Mazars",
+      "jamais": [
+        "mazar",
+        "mazart",
+        "mazard",
+        "mazare"
+      ]
+    },
+    {
+      "ecrire": "FSI",
+      "jamais": [
+        "f.s.i",
+        "f s i",
+        "fsy",
+        "fsi",
+        "ef es i"
+      ]
+    },
+    {
+      "ecrire": "Conseil",
+      "jamais": [],
+      "note": "majuscule quand il s'agit de l'équipe ou du métier"
+    }
+  ]
+}
