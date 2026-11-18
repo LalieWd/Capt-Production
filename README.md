@@ -1,6 +1,21 @@
-# Polices
+# Capt-Production : sous-titrage automatique de vidéos
 
-Mets ici les fichiers de polices des clients (.otf ou .ttf), par exemple :
-- `HalyardDisplay-Medium.otf` pour Forvis Mazars (police commerciale : licence à demander au client).
+Chaîne : dossier Drive « Ajouter les sous-titres » → n8n → ce dépôt (GitHub Actions) → Supabase → validation par e-mail → dépôt Drive.
 
-Si le fichier d'un client est absent, le rendu utilise la police de remplacement du style (Inter) et le signale dans `report.json` (champ `alertes`).
+## Organisation du dépôt
+
+| Dossier / fichier | Rôle |
+|---|---|
+| `.github/workflows/subtitles.yml` | Workflow « Sous-titres » appelé par n8n (phases `transcription` puis `render`). Ne pas renommer ce fichier : n8n le retrouve par son identifiant. |
+| `scripts/process.py` | Transcription (Groq Whisper), phases n8n, rendu ffmpeg, captures. |
+| `scripts/render.py` | Style client → blocs → fichiers ASS/SRT. |
+| `styles/` | Styles de repli (`mazars`, `corporate`, `impact`, `karaoke`, `default`), utilisés si Supabase est injoignable. |
+| `clients.json` | Alias des clients pour la détection de repli. |
+| `fonts/` | Polices des clients (voir `fonts/README.md`). |
+| `inputs/` | Vidéos de test (déjà dans le dépôt, utilisables via `video_path`). |
+
+La source de vérité des clients (style, glossaire, skill) est la table `Clients` de Supabase.
+
+## Secrets GitHub requis
+
+`GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`.
