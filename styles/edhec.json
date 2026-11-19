@@ -14,7 +14,7 @@
     "echelle": 1.35,
     "police_gras": {
       "b": 1,
-      "famille": "Inter"
+      "famille": "Montserrat"
     },
     "effets_defaut": [
       "gras",
@@ -28,12 +28,13 @@
   },
   "police": {
     "casse": "phrase",
-    "famille": "Inter",
-    "fichier": "fonts/Inter-Medium.otf",
+    "famille": "Montserrat",
+    "fichier": "fonts/Montserrat-Medium.otf",
     "graisse": "Medium",
-    "nom_ass": "Inter Medium",
+    "nom_ass": "Montserrat Medium",
     "fallback": "Inter Medium",
-    "taille_px": 75
+    "fichier_fallback": "fonts/Inter-Medium.otf",
+    "taille_px": 76
   },
   "contenu": {
     "emojis": false,
@@ -48,7 +49,7 @@
     "texte": "#FFFFFF",
     "texte_inactif": "#B8B8B8",
     "fond_mot_cle": null,
-    "mot_cle_accent": "#4DA3FF",
+    "mot_cle_accent": "#ED7773",
     "mot_cle_principal": "#FFFFFF",
     "mot_cle_secondaire": "#FFFFFF"
   },
@@ -68,7 +69,7 @@
       "accent"
     ],
     "echelle": 1.35,
-    "frequence": "environ 1 bloc sur 4",
+    "frequence": "environ 1 bloc sur 2",
     "max_par_bloc": 3,
     "bleu_max_par_bloc": 2,
     "rotation_couleurs": [

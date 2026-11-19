@@ -48,7 +48,7 @@
     "texte": "#FFFFFF",
     "texte_inactif": "#B8B8B8",
     "fond_mot_cle": null,
-    "mot_cle_accent": "#FF8A00",
+    "mot_cle_accent": "#DC6D6D",
     "mot_cle_principal": "#FFFFFF",
     "mot_cle_secondaire": "#FFFFFF"
   },
@@ -68,7 +68,7 @@
       "accent"
     ],
     "echelle": 1.35,
-    "frequence": "environ 1 bloc sur 4",
+    "frequence": "environ 1 bloc sur 2",
     "max_par_bloc": 3,
     "bleu_max_par_bloc": 2,
     "rotation_couleurs": [
