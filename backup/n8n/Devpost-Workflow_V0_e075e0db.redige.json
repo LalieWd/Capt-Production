@@ -1,0 +1,2386 @@
+{
+  "name": "Devpost-Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "mode": "list",
+          "value": "__DRIVE_DOSSIER_ENTREE_ID__",
+          "cachedResultName": "Ajouter les sous-titres"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "id": "b08ea6df-ecb7-4b7c-a91d-1cb7dc633250",
+      "name": "Nouvelle vidéo à sous-titrer",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -192
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": null,
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "file_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "title",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "client_code",
+              "value": "={{ ($json.name || '').split('_')[0].trim().toUpperCase() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "174d4807-603b-4707-a22f-8643a89db11d",
+      "name": "Extraire le client du titre",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        288,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "getAll",
+        "projectRef": "__SUPABASE_PROJECT_REF__",
+        "tableId": "Clients",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "actif",
+              "condition": "is",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "id": "7092755f-3b81-43f7-b33a-901f2ec8350f",
+      "name": "Chercher le client",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        512,
+        -192
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": null,
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.code }}",
+              "operator": {
+                "operation": "notEmpty",
+                "singleValue": true,
+                "type": "string"
+              },
+              "rightValue": ""
+            },
+            {
+              "leftValue": "={{ String($json.inconnu === true) }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "false"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "d0e1ced8-4869-4647-b4f3-9a9d9c7dcee2",
+      "name": "Client connu ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "projectRef": "__SUPABASE_PROJECT_REF__",
+        "tableId": "Jobs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "job_id",
+              "fieldValue": "={{ $('Extraire le client du titre').item.json.file_id }}"
+            },
+            {
+              "fieldId": "drive_file_id",
+              "fieldValue": "={{ $('Extraire le client du titre').item.json.file_id }}"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $('Extraire le client du titre').item.json.title }}"
+            },
+            {
+              "fieldId": "client_code",
+              "fieldValue": "={{ $json.code }}"
+            },
+            {
+              "fieldId": "client_email",
+              "fieldValue": "={{ $json.email || '' }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "dispatched"
+            },
+            {
+              "fieldId": "revision",
+              "fieldValue": "0"
+            },
+            {
+              "fieldId": "dispatched_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "id": "8bbe58f2-d8f7-4dae-b893-425793026dd9",
+      "name": "Créer le job",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1184,
+        -288
+      ],
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": null,
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "workflow",
+        "owner": {
+          "__rl": true,
+          "mode": "list",
+          "value": "LalieWd",
+          "cachedResultName": "LalieWd",
+          "cachedResultUrl": "https://github.com/LalieWd"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Capt-Production",
+          "cachedResultName": "Capt-Production",
+          "cachedResultUrl": "https://github.com/LalieWd/Capt-Production"
+        },
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": 422744390,
+          "cachedResultName": "Sous-titres"
+        },
+        "ref": {
+          "__rl": true,
+          "mode": "name",
+          "value": "main"
+        },
+        "inputs": "={{ JSON.stringify({ job_id: $('Extraire le client du titre').item.json.file_id, phase: 'transcription', drive_file_id: $('Extraire le client du titre').item.json.file_id, title: $('Extraire le client du titre').item.json.title, client_code: (() => { for (const n of ['Nouveau client retenu', 'Style par défaut retenu']) { try { const j = $(n).first().json; if (j && j.code) { return j.code; } } catch (e) { } } return $('Trouver le client dans le titre').first().json.code; })(), revision: '0', attempt: '1', subs: '', style: '', callback_url: 'https://__N8N_INSTANCE__.app.n8n.cloud/webhook/pstb-sous-titrage-callback' }) }}"
+      },
+      "id": "3166dd07-2b45-424d-a660-52cf16488b17",
+      "name": "Lancer le runner GitHub",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1408,
+        -288
+      ],
+      "webhookId": "7c191659-1030-419b-a92b-1a4c2825b330",
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": null,
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pstb-sous-titrage-callback",
+        "options": {}
+      },
+      "id": "42b0edd5-fcee-491c-aa98-447680c1c1fe",
+      "name": "Retour du runner GitHub",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        32,
+        1712
+      ],
+      "webhookId": "8908a20d-db93-49a0-89a1-66d973c5f6bf"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.phase }}",
+                    "rightValue": "transcription",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.body.status }}",
+                    "rightValue": "success",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Transcription prête"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.phase }}",
+                    "rightValue": "render",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.body.status }}",
+                    "rightValue": "success",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Rendu prêt"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Échec du runner"
+        }
+      },
+      "id": "d5b7adec-ff6e-4a1a-ab94-d94fed24f716",
+      "name": "Quelle étape ?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        224,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "getAll",
+        "projectRef": "__SUPABASE_PROJECT_REF__",
+        "tableId": "Jobs",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "job_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Retour du runner GitHub').first().json.body.job_id }}"
+            }
+          ]
+        }
+      },
+      "id": "ce29c81f-fe75-4a18-a40e-02c059482c50",
+      "name": "Lire le job",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        560,
+        320
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": null,
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "ef1204ad-7b9d-4e46-9540-5034776d94db",
+      "name": "Rendu reçu",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        640,
+        1664
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "__EMAIL_DESTINATAIRE__",
+        "subject": "={{ 'Échec du sous-titrage : ' + ((() => { try { return $('Passer le job en échec').first().json.title; } catch (e) { return ''; } })() || $('Retour du runner GitHub').first().json.body.title || $('Retour du runner GitHub').first().json.body.job_id) }}",
+        "message": "={{ (() => {\n  const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n  const b = $('Retour du runner GitHub').first().json.body || {};\n  let job = {};\n  try { job = $('Passer le job en échec').first().json || {}; } catch (e) { job = {}; }\n  const titre = esc(job.title || b.title || b.job_id || 'vidéo inconnue');\n  const refusQc = b.status === 'success';\n  let problemes = [];\n  try { problemes = $('Agent contrôle qualité').first().json.output.problemes || []; } catch (e) { problemes = []; }\n  const etapes = { transcription: 'la transcription de l’audio', render: 'le rendu de la vidéo' };\n  const tentative = Number(b.attempt || 1);\n  const intro = refusQc\n    ? 'Le contrôle qualité a refusé le rendu après ' + tentative + ' tentatives. La vidéo n’a pas été déposée dans le dossier Drive.'\n    : 'Le traitement s’est arrêté pendant ' + (etapes[b.phase] || 'une étape du traitement') + ' (tentative ' + tentative + ').';\n  const cause = refusQc\n    ? (problemes.length ? '<ul style=\"margin:8px 0\">' + problemes.map((p) => '<li>' + esc(p) + '</li>').join('') + '</ul>' : '<p>Aucun détail fourni par le contrôle qualité.</p>')\n    : '<p style=\"background:#f5f5f5;padding:10px 12px;border-radius:6px;font-family:monospace;font-size:13px\">' + esc(b.errors || 'aucun détail') + '</p>';\n  const depot = 'https://drive.google.com/drive/folders/__DRIVE_DOSSIER_ENTREE_ID__';\n  const boutonDrive = '<p style=\"margin:28px 0 12px\"><a href=\"' + depot + '\" style=\"background:#1a73e8;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Redéposer la vidéo dans Drive</a></p>';\n  const boutonGithub = b.run_url\n    ? '<p style=\"margin:0 0 24px\"><a href=\"' + esc(b.run_url) + '\" style=\"color:#1a73e8;text-decoration:none;font-weight:bold\">Voir le détail sur GitHub →</a></p>'\n    : '';\n  return '<div style=\"font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px\">'\n    + '<p>Bonjour,</p>'\n    + '<p>Le sous-titrage de la vidéo <b>' + titre + '</b> a échoué.</p>'\n    + '<p>' + intro + '</p>'\n    + '<h3 style=\"margin:24px 0 8px\">' + (refusQc ? 'Problèmes relevés' : 'Cause') + '</h3>'\n    + cause\n    + '<h3 style=\"margin:24px 0 8px\">Que faire ?</h3>'\n    + '<p>Redéposez la vidéo dans le dossier Drive « Ajouter les sous-titres » pour relancer le traitement. Si l’échec se répète, le détail technique est disponible sur GitHub.</p>'\n    + boutonDrive\n    + boutonGithub\n    + '<p style=\"color:#666;font-size:13px\">Le job est marqué en échec dans la base.</p>'\n    + '</div>';\n})() }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "9dee5e5e-fdbf-486c-aa4c-7db28e1b4702",
+      "name": "Alerte rendu en échec",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2576,
+        1376
+      ],
+      "webhookId": "9ef5a6e8-43ef-4fd6-8d15-178f27d25cf4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": null,
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "getAll",
+        "projectRef": "__SUPABASE_PROJECT_REF__",
+        "tableId": "Clients",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "code",
+              "condition": "ilike",
+              "keyValue": "={{ $json.client_code }}"
+            }
+          ]
+        }
+      },
+      "id": "31540d79-122d-474b-90d1-14433136f8a1",
+      "name": "Lire le client",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        784,
+        320
+      ],
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": null,
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "t1",
+              "name": "job_id",
+              "value": "={{ $('Retour du runner GitHub').first().json.body.job_id }}",
+              "type": "string"
+            },
+            {
+              "id": "t2",
+              "name": "tache",
+              "value": "transcription",
+              "type": "string"
+            },
+            {
+              "id": "t3",
+              "name": "title",
+              "value": "={{ $('Lire le job').first().json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "t4",
+              "name": "drive_file_id",
+              "value": "={{ $('Lire le job').first().json.drive_file_id }}",
+              "type": "string"
+            },
+            {
+              "id": "t5",
+              "name": "client_code",
+              "value": "={{ $json.code }}",
+              "type": "string"
+            },
+            {
+              "id": "t6",
+              "name": "revision",
+              "value": "={{ String($('Lire le job').first().json.revision || 0) }}",
+              "type": "string"
+            },
+            {
+              "id": "t7",
+              "name": "skill_md",
+              "value": "={{ $json.skill_md || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "t8",
+              "name": "style",
+              "value": "={{ JSON.stringify($json.style || {}) }}",
+              "type": "string"
+            },
+            {
+              "id": "t9",
+              "name": "glossaire",
+              "value": "={{ JSON.stringify($json.glossaire || []) }}",
+              "type": "string"
+            },
+            {
+              "id": "t10",
+              "name": "mots",
+              "value": "={{ (() => { const raw = $('Retour du runner GitHub').first().json.body.mots; if (!raw) return ''; try { const m = typeof raw === 'string' ? JSON.parse(raw) : raw; return m.map(w => w.word + '|' + (+w.start).toFixed(2) + '|' + (+w.end).toFixed(2)).join(' '); } catch (e) { return String(raw); } })() }}",
+              "type": "string"
+            },
+            {
+              "id": "t11",
+              "name": "subs_precedents",
+              "value": "={{ $('Retour du runner GitHub').first().json.body.subs || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "t12",
+              "name": "commentaires",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b4ce3cdd-2c4c-4136-9b68-30595f24e5bc",
+      "name": "Préparer la tâche",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1008,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Vidéo : {{ $json.title }} (client {{ $json.client_code }})\n\n## Style du client (extrait de sa skill)\n{{ (() => { const s = String($json.skill_md || ''); const i = s.indexOf('## 7.'); const j = s.indexOf('## 8.'); const k = i >= 0 ? s.slice(i, j > i ? j : i + 1500) : s.slice(0, 1000); return k.slice(0, 1400); })() }}\n\n## Glossaire (écrire exactement ainsi)\n{{ (() => { try { return JSON.parse($json.glossaire).map((g) => g.ecrire + (g.note ? ' (' + g.note + ')' : '')).join('; '); } catch (e) { return String($json.glossaire || '').slice(0, 500); } })() }}\n\n## Transcription mot|début|fin (secondes)\n{{ String($json.mots).replace(/(\\d+\\.\\d)\\d/g, '$1') }}{{ $json.subs_precedents ? '\\n\\n## Sous-titres précédents\\n' + $json.subs_precedents + '\\n\\n## Commentaires de relecture\\n' + $json.commentaires : '' }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=Tu es le sous-titreur des vidéos de {{ $('Lire le client').first().json.code === 'default' ? 'ce client (style par défaut)' : ($('Lire le client').first().json.nom || $json.client_code) }}. Vidéo verticale (TikTok, Reels, Shorts). Tu réponds directement, sans longue réflexion.\n\nMISSION : rédiger les sous-titres à partir de la transcription mot|début|fin, appliquer le style et le glossaire du client, et livrer les sous-titres horodatés, les ajustements de style éventuels (sinon objet vide) et une phrase de résumé. Si des sous-titres précédents et des commentaires sont fournis, applique seulement les commentaires et garde le reste.\n\nRÈGLES\n1. Fidélité : garde exactement les mots prononcés. Ne remplace aucun mot par un synonyme, ne reformule pas, n'ajoute ni ne supprime de mot (sauf hésitations comme euh, hum, et bégaiements). Corrige seulement l'orthographe, la ponctuation, les accords et conjugaisons, les noms propres, les termes du glossaire (il fait foi) et les mots mal transcrits qui n'ont aucun sens dans la phrase.\n2. Sous-titres courts : 1 à 2 lignes, 32 caractères max par ligne, 1 à 3 s chacun. Coupe aux pauses naturelles, jamais au milieu d'un groupe de mots.\n3. start = début du premier mot, end = fin du dernier mot. Aucun chevauchement.\n4. highlight : {{ (($('Lire le client').first().json.style || {}).mots_cles || {}).frequence || 'environ 1 bloc sur 4' }} a un mot-clé blanc agrandi. Mets 1 mot dans highlight : un mot fort (verbe, nom), jamais un mot outil, écrit exactement comme dans le sous-titre.\n5. accent : le mot-clé en couleur d'accentuation de la marque. Mets 1 mot dans accent sur environ 1 sous-titre sur 4 : le mot qui porte l'idée de la phrase, souvent le dernier mot fort. Écris-le exactement comme dans le sous-titre, jamais le même mot que highlight, jamais sur 2 sous-titres de suite.\n6. impact : [{texte, effets}] sur un chiffre clé, un mot important ou la chute. Il sort dans la couleur de la marque et agrandi. texte = 1 à 4 mots exacts du sous-titre, effets parmi {{ ((($('Lire le client').first().json.style || {}).impact || {}).effets_autorises || ['gras', 'agrandi', 'capitales']).join(', ') }}. Environ 1 sous-titre sur 5, jamais sur les mêmes mots que highlight ou accent, jamais sur 2 sous-titres de suite.\n7. genre (absent = style du client). Autorisés : {{ ((($('Lire le client').first().json.style || {}).genres_autorises) || ['corporate', 'impact', 'karaoke']).join(', ') }}. corporate = apparition progressive pour une information posée ; impact = majuscules, gras, pop pour une accroche ou une chute de 5 mots au plus ; karaoke = mot prononcé allumé pour un passage rythmé de 2 à 4 sous-titres de suite. Utilise impact sur 1 à 2 sous-titres, et karaoke seulement si un passage s'y prête. Au plus 1 sous-titre sur 4 hors du style du client.\n\nSeuls les champs start, end et text sont toujours présents ; notes tient en une phrase.",
+          "maxIterations": 3
+        }
+      },
+      "id": "32209e13-fffe-426c-919f-e4f81b19e142",
+      "name": "Agent sous-titrage",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1232,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "subs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "number",
+                    "description": "Début en secondes"
+                  },
+                  "end": {
+                    "type": "number",
+                    "description": "Fin en secondes"
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Texte affiché (1 à 2 lignes)"
+                  },
+                  "highlight": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Mots à mettre en avant"
+                  },
+                  "impact": {
+                    "description": "Mots ou courte phrase à mettre en impact (police et couleur de la marque + gras, agrandi ou capitales). Le plus souvent vide.",
+                    "items": {
+                      "properties": {
+                        "effets": {
+                          "items": {
+                            "enum": [
+                              "gras",
+                              "agrandi",
+                              "capitales"
+                            ],
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "texte": {
+                          "description": "1 à 4 mots exacts du sous-titre",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "texte"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "genre": {
+                    "description": "Genre de style de ce sous-titre. Absent = style du client (cas le plus fréquent).",
+                    "enum": [
+                      "corporate",
+                      "impact",
+                      "karaoke"
+                    ],
+                    "type": "string"
+                  },
+                  "accent": {
+                    "description": "Mot en couleur d'accentuation de la marque (1 mot du sous-titre, souvent le dernier mot porteur d'idée)",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end",
+                  "text"
+                ]
+              }
+            },
+            "style": {
+              "type": "object",
+              "description": "Ajustements de style à appliquer au rendu (couleurs, police, position). Objet vide si aucun."
+            },
+            "notes": {
+              "type": "string",
+              "description": "Résumé des corrections faites"
+            }
+          },
+          "required": [
+            "subs",
+            "notes"
+          ]
+        }
+      },
+      "id": "76c5ffbb-4235-4445-be1e-37991a623e18",
+      "name": "Format subs.json",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1424,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "workflow",
+        "owner": {
+          "__rl": true,
+          "mode": "list",
+          "value": "LalieWd",
+          "cachedResultName": "LalieWd",
+          "cachedResultUrl": "https://github.com/LalieWd"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Capt-Production",
+          "cachedResultName": "Capt-Production",
+          "cachedResultUrl": "https://github.com/LalieWd/Capt-Production"
+        },
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": 422744390,
+          "cachedResultName": "Sous-titres"
+        },
+        "ref": {
+          "__rl": true,
+          "mode": "name",
+          "value": "main"
+        },
+        "inputs": "={{ JSON.stringify({ job_id: $('Préparer la tâche').first().json.job_id, phase: 'render', drive_file_id: $('Préparer la tâche').first().json.drive_file_id, title: $('Préparer la tâche').first().json.title, client_code: $('Préparer la tâche').first().json.client_code, revision: $('Préparer la tâche').first().json.revision, attempt: '1', subs: JSON.stringify($json.output.subs), style: JSON.stringify(Object.assign({}, JSON.parse($('Préparer la tâche').first().json.style || '{}'), $json.output.style || {})), callback_url: 'https://__N8N_INSTANCE__.app.n8n.cloud/webhook/pstb-sous-titrage-callback' }) }}"
+      },
+      "id": "1954ad00-19c7-4632-836a-9a851c136fab",
+      "name": "Lancer le rendu",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1584,
+        320
+      ],
+      "webhookId": "a8458bc5-3290-4b81-a9cb-29794f0b33c5",
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": null,
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "6508dd58-aa1e-4cdb-9d25-9315769e7dbd",
+      "name": "Combiner rendu et contrôle",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1216,
+        1680
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Contrôle du rendu – client {{ $json.body.client_code }}, tentative {{ $json.body.attempt }}.\nLes images jointes sont 2 captures de la vidéo rendue.\n\n## Sous-titres utilisés (début-fin texte <mot-clé blanc> ~mot accentué~ [genre] {impact})\n{{ (() => { try { return JSON.parse($json.body.subs).map((s) => Number(s.start).toFixed(1) + '-' + Number(s.end).toFixed(1) + ' ' + String(s.text).replace(/\\n/g, ' ') + (Array.isArray(s.highlight) && s.highlight.length ? ' <' + s.highlight.join(',') + '>' : '') + (Array.isArray(s.accent) && s.accent.length ? ' ~' + s.accent.join(',') + '~' : '') + (s.genre ? ' [' + s.genre + ']' : '') + (Array.isArray(s.impact) && s.impact.length ? ' {impact}' : '')).join('\\n'); } catch (e) { return String($json.body.subs || '').slice(0, 1500); } })() }}\n\n## Style appliqué (résumé)\n{{ (() => { try { const s = JSON.parse($json.body.style || '{}'); return JSON.stringify({ police: s.police && s.police.famille, texte: s.couleurs && s.couleurs.texte, accent: s.couleurs && s.couleurs.mot_cle_accent }); } catch (e) { return ''; } })() }}\n\n## Remarques du runner\n{{ $json.body.errors || 'aucune' }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=Tu es le contrôleur qualité des sous-titres de {{ $json.body.client_code === 'default' ? 'ce client (style par défaut)' : ($json.body.client_code || 'ce client') }}. Tu regardes 2 captures d'une vidéo verticale sous-titrée et tu relis la liste des sous-titres. Un humain regarde ensuite la vidéo et la valide : tu ne cherches que les défauts nets, pas la perfection. Réponds de façon compacte.\n\nProblèmes BLOQUANTS (les seuls qui justifient un refus) :\n1. Texte illisible : trop petit, sans contraste, flou ou coupé par le bord de l'écran.\n2. Texte caché sous l'interface TikTok (bas ou droite), ou qui masque le visage.\n3. Plus de 2 lignes par sous-titre, ou ligne qui déborde de l'écran.\n4. Orthographe : faute évidente (mot mal écrit, accent ou majuscule manquants sur un nom propre).\n5. Grammaire et cohérence : relis chaque phrase comme un correcteur. Est bloquant une erreur de conjugaison (« je vais fait »), d'accord (genre, nombre, participe passé), de temps, un mot manquant ou en trop qui casse la phrase, ou un mot qui n'a aucun sens dans la phrase (souvent une erreur de transcription : homophone, mot proche phonétiquement). Une tournure orale familière (« j'ai pas envie », « t'es là ») n'est pas une erreur.\n6. Sous-titres totalement plats : aucun mot-clé, accent ni impact dans toute la liste.\n\nNE BLOQUE JAMAIS pour : la vitesse de lecture, le nombre ou le choix des mots-clés, accents, impacts et genres, la position des sous-titres (fixée par le style du client), un sous-titre très court, une question de goût.\n\nDÉCISION\n- ok : aucun problème bloquant, ou problème que tu ne peux pas régler en modifiant les sous-titres. Renvoie problemes, subs et style vides. En cas de doute, choisis ok.\n- refaire : au moins un problème bloquant que tu corriges réellement. Liste-le dans problemes (une phrase) et renvoie le subs.json complet corrigé : horodatages de la voix inchangés, champs highlight, accent, impact et genre conservés, et pour les fautes de grammaire change le moins de mots possible en gardant le sens et les mots prononcés. Une seule reprise est possible : ne refuse que si ta correction change vraiment le résultat.\n\nRéponds uniquement au format demandé.",
+          "maxIterations": 2,
+          "passthroughBinaryImages": true
+        }
+      },
+      "id": "314af1dc-5401-40aa-be98-3639178a7462",
+      "name": "Agent contrôle qualité",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        864,
+        1520
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "decision": {
+              "type": "string",
+              "enum": [
+                "ok",
+                "refaire"
+              ]
+            },
+            "problemes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Problèmes vus sur les images"
+            },
+            "subs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "number",
+                    "description": "Début en secondes"
+                  },
+                  "end": {
+                    "type": "number",
+                    "description": "Fin en secondes"
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Texte affiché (1 à 2 lignes)"
+                  },
+                  "highlight": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Mots à mettre en avant"
+                  },
+                  "impact": {
+                    "description": "Mots ou courte phrase à mettre en impact (police et couleur de la marque + gras, agrandi ou capitales). Le plus souvent vide.",
+                    "items": {
+                      "properties": {
+                        "effets": {
+                          "items": {
+                            "enum": [
+                              "gras",
+                              "agrandi",
+                              "capitales"
+                            ],
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "texte": {
+                          "description": "1 à 4 mots exacts du sous-titre",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "texte"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "genre": {
+                    "description": "Genre de style de ce sous-titre. Absent = style du client.",
+                    "enum": [
+                      "corporate",
+                      "impact",
+                      "karaoke"
+                    ],
+                    "type": "string"
+                  },
+                  "accent": {
+                    "description": "Mot en couleur d'accentuation de la marque",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end",
+                  "text"
+                ]
+              },
+              "description": "subs.json corrigé si decision = refaire, sinon tableau vide"
+            },
+            "style": {
+              "type": "object",
+              "description": "Ajustements de style corrigés si decision = refaire, sinon objet vide"
+            }
+          },
+          "required": [
+            "decision",
+            "problemes"
+          ]
+        }
+      },
+      "id": "2eeb0c71-b102-46f1-bdad-aafff21d4e7f",
+      "name": "Format décision",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1072,
+        1776
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "or",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.decision }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "ok"
+                  },
+                  {
+                    "leftValue": "={{ Number($json.body.attempt || 1) }}",
+                    "operator": {
+                      "operation": "gte",
+                      "type": "number"
+                    },
+                    "rightValue": 2
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Validé"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.decision }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "refaire"
+                  },
+                  {
+                    "leftValue": "={{ Number($json.body.attempt || 1) }}",
+                    "operator": {
+                      "operation": "lt",
+                      "type": "number"
+                    },
+                    "rightValue": 2
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "À refaire (1 reprise)"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Autre"
+        }
+      },
+      "id": "e257fbd1-c384-4b5b-9f58-6db72f606be1",
+      "name": "Décision du contrôle",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1392,
+        1664
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f7c1d1b0-7a40-43ef-8de6-df71d7fdc515",
+      "name": "Rendu approuvé",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1888,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "workflow",
+        "owner": {
+          "__rl": true,
+          "mode": "list",
+          "value": "LalieWd",
+          "cachedResultName": "LalieWd",
+          "cachedResultUrl": "https://github.com/LalieWd"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Capt-Production",
+          "cachedResultName": "Capt-Production",
+          "cachedResultUrl": "https://github.com/LalieWd/Capt-Production"
+        },
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": 422744390,
+          "cachedResultName": "Sous-titres"
+        },
+        "ref": {
+          "__rl": true,
+          "mode": "name",
+          "value": "main"
+        },
+        "inputs": "={{ JSON.stringify({ job_id: $json.body.job_id, phase: 'render', drive_file_id: $json.body.drive_file_id, title: $json.body.title, client_code: $json.body.client_code, revision: String($json.body.revision || 0), attempt: String(Number($json.body.attempt || 1) + 1), subs: ($json.output.subs && $json.output.subs.length) ? JSON.stringify($json.output.subs) : $json.body.subs, style: JSON.stringify(Object.assign({}, JSON.parse($json.body.style || '{}'), $json.output.style || {})), callback_url: 'https://__N8N_INSTANCE__.app.n8n.cloud/webhook/pstb-sous-titrage-callback' }) }}"
+      },
+      "id": "cd8d468f-e00d-435f-8360-f101f813e843",
+      "name": "Relancer le rendu corrigé",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        2016,
+        1168
+      ],
+      "webhookId": "7d33d5e4-254c-48b1-bfd9-fb13faff5ff1",
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": null,
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "update",
+        "projectRef": "__SUPABASE_PROJECT_REF__",
+        "tableId": "Jobs",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "job_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Retour du runner GitHub').item.json.body.job_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "failed"
+            }
+          ]
+        }
+      },
+      "id": "705eaa1c-c034-44b8-93b1-296b4bf76d79",
+      "name": "Passer le job en échec",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2352,
+        1376
+      ],
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": null,
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "video",
+        "name": "={{ ($('Rendu approuvé').first().json.body.title || 'video').replace(/\\.[^.]+$/, '') }}_v{{ $('Rendu approuvé').first().json.body.revision || 0 }}_sous-titree.mp4",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "__DRIVE_DOSSIER_VALIDER_ID__",
+          "cachedResultName": "Capt-Production",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/__DRIVE_DOSSIER_PARENT_ID__"
+        },
+        "options": {}
+      },
+      "id": "1fa38a55-4be7-45d6-92e1-c65153024be0",
+      "name": "Déposer la vidéo sous-titrée",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2288,
+        704
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": null,
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "srt",
+        "name": "={{ ($('Rendu approuvé').first().json.body.title || 'video').replace(/\\.[^.]+$/, '') }}_v{{ $('Rendu approuvé').first().json.body.revision || 0 }}.srt",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "__DRIVE_DOSSIER_VALIDER_ID__",
+          "cachedResultName": "Capt-Production",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/__DRIVE_DOSSIER_PARENT_ID__"
+        },
+        "options": {}
+      },
+      "id": "be1db9cb-40d8-4a4c-af78-7dee1bcfcdf9",
+      "name": "Déposer le .srt",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2288,
+        896
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": null,
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "useDataOfInput": "1"
+      },
+      "id": "83933351-d6ab-4757-bb94-cb1f6261d13c",
+      "name": "Attendre les deux dépôts",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2512,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "update",
+        "projectRef": "__SUPABASE_PROJECT_REF__",
+        "tableId": "Jobs",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "job_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Retour du runner GitHub').first().json.body.job_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "review"
+            },
+            {
+              "fieldId": "drive_review_file_id",
+              "fieldValue": "={{ $('Déposer la vidéo sous-titrée').first().json.id }}"
+            },
+            {
+              "fieldId": "drive_review_srt_id",
+              "fieldValue": "={{ $('Déposer le .srt').first().json.id }}"
+            }
+          ]
+        }
+      },
+      "id": "72b60f66-7d85-4786-8667-1e4cce6b8591",
+      "name": "Passer le job en revue",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2736,
+        800
+      ],
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": null,
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Garde le client dont le code, le nom ou un alias est CONTENU dans le titre de la vidéo.\n// Aucun client trouvé : on applique le style « Par défaut » (ligne code = default) au lieu de s'arrêter.\nconst title = $('Extraire le client du titre').first().json.title || '';\nconst norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');\nconst t = norm(title);\nlet best = null;\nlet bestLen = 0;\nlet bestTerm = '';\nfor (const item of $input.all()) {\n  const c = item.json;\n  if (!c || !c.code) continue;\n  const terms = [c.code, c.nom, ...(Array.isArray(c.alias) ? c.alias : [])];\n  for (const term of terms) {\n    const n = norm(term);\n    if (n.length >= 3 && t.includes(n) && n.length > bestLen) {\n      best = c;\n      bestLen = n.length;\n      bestTerm = term;\n    }\n  }\n}\nif (!best) {\n  const defaut = $input.all().map((i) => i.json).find((c) => c && c.code === 'default');\n  if (defaut) return [{ json: { ...defaut, matched_term: '', inconnu: true } }];\n}\n// Ni client ni style par défaut : un item vide pour que « Client connu ? » prenne la branche alerte.\nreturn [{ json: best ? { ...best, matched_term: bestTerm } : {} }];"
+      },
+      "id": "cb5661c1-9c45-4ce0-bc93-935733d06dd3",
+      "name": "Trouver le client dans le titre",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.body.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "video"
+            }
+          }
+        }
+      },
+      "id": "ca14226b-9031-43b2-bc51-e3de6d6ca178",
+      "name": "Télécharger la vidéo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2064,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.body.srt_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "srt"
+            }
+          }
+        }
+      },
+      "id": "68f436dd-c2ac-4a5f-903e-59dbc7033e02",
+      "name": "Télécharger le .srt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2064,
+        896
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "__EMAIL_DESTINATAIRE__",
+        "subject": "=Nouveau fichier à valider : {{ $('Passer le job en revue').first().json.title }}",
+        "message": "={{ (() => {\n  const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n  const b = $('Rendu approuvé').first().json.body || {};\n  let subs = [];\n  try { subs = JSON.parse(b.subs || '[]'); } catch (e) { subs = []; }\n  const titre = esc(b.title || $('Passer le job en revue').first().json.title);\n  const fin = subs.reduce((m, s) => Math.max(m, Number(s.end) || 0), 0);\n  const min = Math.floor(fin / 60);\n  const sec = Math.round(fin % 60);\n  const duree = min > 0 ? min + ' min ' + String(sec).padStart(2, '0') + ' s' : sec + ' s';\n  const cl = $('Lire le client pour le mail').first().json || {};\n  const code = b.client_code || cl.code || '';\n  const defaut = code === 'default';\n  const style = defaut ? 'Style par défaut (aucune marque reconnue dans le titre)' : esc(cl.nom || cl.menu_label || code);\n  const genres = {};\n  subs.forEach((s) => { if (s.genre) { genres[s.genre] = (genres[s.genre] || 0) + 1; } });\n  const liste = Object.keys(genres).map((g) => g + ' : ' + genres[g]).join(', ');\n  const nImpact = subs.filter((s) => Array.isArray(s.impact) && s.impact.length > 0).length;\n  const reprises = Math.max(0, Number(b.attempt || 1) - 1);\n  const idFichier = $('Déposer la vidéo sous-titrée').first().json.id;\n  const dossier = 'https://drive.google.com/drive/folders/__DRIVE_DOSSIER_VALIDER_ID__';\n  const lien = idFichier ? 'https://drive.google.com/file/d/' + idFichier + '/view' : dossier;\n  const ligne = (k, v) => '<tr><td style=\"padding:4px 16px 4px 0;color:#666\">' + k + '</td><td style=\"padding:4px 0\"><b>' + v + '</b></td></tr>';\n  const controles = ['Lisibilité du texte', 'Cadrage dans la zone sûre', 'Longueur des lignes', 'Respect du style de la marque', 'Orthographe', 'Grammaire et conjugaison', 'Mots mis en impact', 'Variantes de style'];\n  const verdict = reprises > 0 ? 'Validé après ' + reprises + ' correction' + (reprises > 1 ? 's' : '') + '.' : 'Validé dès le premier rendu.';\n  return '<div style=\"font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px\">'\n    + '<p>Bonjour,</p>'\n    + '<p>La vidéo <b>' + titre + '</b> a été sous-titrée et contrôlée automatiquement. Elle attend votre validation : cliquez sur <b>Approuver la vidéo</b> ou sur <b>Refuser</b> en bas de ce mail.</p>'\n    + '<p style=\"margin:20px 0\"><a href=\"' + lien + '\" style=\"background:#1a73e8;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Regarder la vidéo</a></p>'\n    + '<h3 style=\"margin:24px 0 8px\">Résumé du traitement</h3>'\n    + '<table style=\"border-collapse:collapse\">'\n    + ligne('Style utilisé', style)\n    + ligne('Durée de la vidéo (environ)', duree)\n    + ligne('Sous-titres', subs.length)\n    + ligne('Variantes de style choisies', liste || 'aucune (style de la marque partout)')\n    + ligne('Sous-titres avec mots en impact', nImpact)\n    + '</table>'\n    + '<h3 style=\"margin:24px 0 8px\">Contrôle qualité</h3>'\n    + '<p>' + verdict + ' Points vérifiés par le second agent sur 2 captures de la vidéo et sur le texte des sous-titres :</p>'\n    + '<p style=\"line-height:1.7\">' + controles.map((c) => '✓ ' + c).join('<br>') + '</p>'\n    + '<p style=\"color:#666;font-size:13px\">La vidéo et son fichier .srt sont aussi dans le dossier Drive <a href=\"' + dossier + '\">Valider</a>.</p>'\n    + (defaut ? '<p style=\"color:#b45309;font-size:13px\">Aucune marque n’a été reconnue dans le titre : le style par défaut a été appliqué.</p>' : '')\n    + '</div>';\n})() }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "Approuver la vidéo",
+            "disapproveLabel": "Refuser"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 7,
+              "resumeUnit": "days"
+            }
+          },
+          "appendAttribution": false
+        }
+      },
+      "id": "76b46193-2ad6-455f-a385-a4d5fdd2a349",
+      "name": "Prévenir : à valider",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3184,
+        800
+      ],
+      "webhookId": "e47239aa-d8ef-4f27-834e-643c49d59a87",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": null,
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "getAll",
+        "projectRef": "__SUPABASE_PROJECT_REF__",
+        "tableId": "Clients",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "code",
+              "condition": "ilike",
+              "keyValue": "={{ $('Passer le job en revue').first().json.client_code }}"
+            }
+          ]
+        }
+      },
+      "id": "6086d944-c648-4e31-886f-bc349d3ea956",
+      "name": "Lire le client pour le mail",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2960,
+        800
+      ],
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": null,
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "__EMAIL_DESTINATAIRE__",
+        "subject": "=Marque non reconnue : {{ $('Extraire le client du titre').first().json.title }}",
+        "message": "=<p>Bonjour,</p><p>La vidéo <b>{{ $('Extraire le client du titre').first().json.title }}</b> a été déposée dans « Ajouter les sous-titres », mais son titre ne contient le nom, le code ou l’alias d’aucune marque connue.</p><p><b>Le traitement est en pause</b> tant que vous n’avez pas répondu. Trois choix sont possibles :</p><ul><li><b>Continuer avec le style par défaut</b> : la vidéo est sous-titrée en blanc, police Inter, sans identité de marque.</li><li><b>Créer un style pour cette marque</b> : indiquez son nom, ses alias et sa couleur. Le style reprend le style par défaut et pourra être affiné ensuite dans Supabase.</li><li><b>Arrêter la génération</b> : rien n’est lancé, la vidéo reste dans le dossier Drive.</li></ul><p style=\"color:#666;font-size:13px\">Pour que la marque soit reconnue automatiquement la prochaine fois, son nom doit figurer dans le titre du fichier.</p>",
+        "responseType": "customForm",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Que faire ?",
+              "fieldType": "dropdown",
+              "defaultValue": "Continuer avec le style par défaut",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Continuer avec le style par défaut"
+                  },
+                  {
+                    "option": "Créer un style pour cette marque"
+                  },
+                  {
+                    "option": "Arrêter la génération"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Nom de la marque (pour créer un style)",
+              "placeholder": "Ex. Forvis Mazars"
+            },
+            {
+              "fieldLabel": "Alias, séparés par des virgules",
+              "placeholder": "Ex. mazars, fm"
+            },
+            {
+              "fieldLabel": "Couleur de la marque (facultatif)",
+              "placeholder": "Ex. #3070C8"
+            }
+          ]
+        },
+        "options": {
+          "messageButtonLabel": "Choisir une action",
+          "responseFormTitle": "Marque non reconnue",
+          "responseFormDescription": "Choisissez ce qu'il faut faire de cette vidéo. Pour créer un style, renseignez au moins le nom de la marque.",
+          "responseFormButtonLabel": "Valider",
+          "appendAttribution": false
+        }
+      },
+      "id": "28d6e15e-a1a0-45c6-b922-8efc8691daf1",
+      "name": "Prévenir : marque inconnue",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1184,
+        -96
+      ],
+      "webhookId": "b0a53d8b-42f0-4f24-9511-071348b33cac",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": null,
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalise la réponse du formulaire : action (arreter / continuer / creer), nom, alias, couleur.\nconst brut = $input.first().json || {};\nconst d = (brut.data && typeof brut.data === 'object') ? brut.data : brut;\nlet action = '';\nlet nom = '';\nlet alias = '';\nlet couleur = '';\nfor (const [k, v] of Object.entries(d)) {\n  const cle = String(k).toLowerCase();\n  const val = String(v == null ? '' : v).trim();\n  if (cle.includes('que faire')) action = val;\n  else if (cle.includes('alias')) alias = val;\n  else if (cle.includes('couleur')) couleur = val;\n  else if (cle.includes('nom')) nom = val;\n}\nconst a = action.toLowerCase();\nlet choix = 'arreter';\nif (a.includes('continuer')) choix = 'continuer';\nelse if (a.includes('créer')) choix = 'creer';\n// Création demandée sans nom de marque : on continue avec le style par défaut plutôt que de bloquer.\nconst sansNom = choix === 'creer' && !nom;\nif (sansNom) choix = 'continuer';\nreturn [{ json: { action: choix, nom, alias: alias.split(/[,;]+/).map((s) => s.trim()).filter(Boolean), couleur, sans_nom: sansNom } }];"
+      },
+      "id": "ef3f6ed2-0e8f-45e5-8df9-013a31f92593",
+      "name": "Lire la réponse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "arreter"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Arrêter"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "continuer"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Style par défaut"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "creer"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Créer le style"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2ae53b29-3ec6-4c08-b375-90eddb15e34d",
+      "name": "Décision du mail",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1632,
+        -96
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "fc1f3728-3882-4f3f-bb1f-6e4980bc9b90",
+      "name": "Génération arrêtée",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1856,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1",
+              "name": "code",
+              "type": "string",
+              "value": "default"
+            },
+            {
+              "id": "d2",
+              "name": "email",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a49bce6a-2bee-41d4-a384-ad49261720e5",
+      "name": "Style par défaut retenu",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1856,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prépare la nouvelle ligne de la table Clients : copie du style par défaut, nom, alias et couleur de la marque.\nconst rep = $input.first().json;\nconst tous = $('Chercher le client').all().map((i) => i.json).filter((c) => c && c.code);\nconst defaut = tous.find((c) => c.code === 'default') || {};\nconst norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');\nlet code = norm(rep.nom) || 'client';\nconst pris = new Set(tous.map((c) => String(c.code).toLowerCase()).concat(['default', 'corporate', 'impact', 'karaoke']));\nwhile (pris.has(code)) code += '2';\nconst base = JSON.parse(JSON.stringify(typeof defaut.style === 'string' ? JSON.parse(defaut.style) : (defaut.style || {})));\nbase.client = rep.nom;\nbase.code = code.toUpperCase();\nif (/^#[0-9a-fA-F]{6}$/.test(rep.couleur || '')) {\n  base.couleurs = Object.assign({}, base.couleurs, { mot_cle_accent: rep.couleur });\n  base.impact = Object.assign({}, base.impact, { couleur: rep.couleur });\n}\nreturn [{ json: { code, nom: rep.nom, menu_label: rep.nom, alias: JSON.stringify(rep.alias || []), style: JSON.stringify(base), glossaire: '[]', actif: 'true', skill_md: defaut.skill_md || '' } }];"
+      },
+      "id": "820135c2-867a-4061-9048-f551415e4baa",
+      "name": "Préparer le style du client",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "projectRef": "__SUPABASE_PROJECT_REF__",
+        "tableId": "Clients",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "code",
+              "fieldValue": "={{ $json.code }}"
+            },
+            {
+              "fieldId": "nom",
+              "fieldValue": "={{ $json.nom }}"
+            },
+            {
+              "fieldId": "menu_label",
+              "fieldValue": "={{ $json.menu_label }}"
+            },
+            {
+              "fieldId": "alias",
+              "fieldValue": "={{ $json.alias }}"
+            },
+            {
+              "fieldId": "style",
+              "fieldValue": "={{ $json.style }}"
+            },
+            {
+              "fieldId": "glossaire",
+              "fieldValue": "={{ $json.glossaire }}"
+            },
+            {
+              "fieldId": "actif",
+              "fieldValue": "={{ $json.actif }}"
+            },
+            {
+              "fieldId": "skill_md",
+              "fieldValue": "={{ $json.skill_md }}"
+            }
+          ]
+        }
+      },
+      "id": "853f3364-c8ce-4240-95ec-85df843049f6",
+      "name": "Créer le client",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        96
+      ],
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": null,
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n1",
+              "name": "code",
+              "type": "string",
+              "value": "={{ $('Préparer le style du client').first().json.code }}"
+            },
+            {
+              "id": "n2",
+              "name": "email",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8d82ca6c-5760-4681-abcd-8df24f6d8969",
+      "name": "Nouveau client retenu",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2304,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Le modèle de vision est limité à 7000 tokens d'entrée par minute : on ne garde que 2 captures (au tiers et aux deux tiers de la vidéo) et on retire les autres fichiers (report.json, etc.) qui seraient envoyés au modèle.\nreturn $input.all().map((item) => {\n  const bin = item.binary || {};\n  const noms = Object.keys(bin).filter((k) => /^capture_\\d+$/.test(k)).sort((a, b) => Number(a.slice(8)) - Number(b.slice(8)));\n  const garder = noms.length <= 2 ? noms : [noms[Math.floor(noms.length / 3)], noms[Math.floor((2 * noms.length) / 3)]];\n  const reste = {};\n  for (const k of garder) { reste[k] = bin[k]; }\n  return { json: item.json, binary: reste };\n});"
+      },
+      "id": "7edde671-1699-4d10-a978-0f7e8a80ac1c",
+      "name": "Garder 2 captures",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        1520
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "cachedResultName": "Claude Sonnet 5",
+          "mode": "list",
+          "value": "claude-sonnet-5"
+        },
+        "options": {
+          "maxTokensToSample": 10000,
+          "thinkingMode": "disabled"
+        }
+      },
+      "id": "b80fe3ef-ec06-4070-8df9-9443f89d8658",
+      "name": "Claude sous-titrage",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        1136,
+        528
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "cachedResultName": "Claude Sonnet 5",
+          "mode": "list",
+          "value": "claude-sonnet-5"
+        },
+        "options": {
+          "maxTokensToSample": 4000,
+          "thinkingMode": "disabled"
+        }
+      },
+      "id": "9eafb797-4e0e-4ddd-b3d0-d7c0c52c5ddb",
+      "name": "Claude contrôle qualité",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        768,
+        1776
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ String($json.data.approved) }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "true"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "37eb7ac8-fc59-4842-b16c-f07497f2fdd9",
+      "name": "Vidéo approuvée ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3408,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "update",
+        "projectRef": "__SUPABASE_PROJECT_REF__",
+        "tableId": "Jobs",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "job_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Retour du runner GitHub').first().json.body.job_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "approved"
+            }
+          ]
+        }
+      },
+      "id": "d02d1f17-c5b2-46eb-8eab-42cd57462d07",
+      "name": "Job approuvé",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3632,
+        704
+      ],
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": null,
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "update",
+        "projectRef": "__SUPABASE_PROJECT_REF__",
+        "tableId": "Jobs",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "job_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Retour du runner GitHub').first().json.body.job_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "rejected"
+            }
+          ]
+        }
+      },
+      "id": "8911fe72-f508-4e46-adce-1210affbfb82",
+      "name": "Job refusé",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3632,
+        896
+      ],
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": null,
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Nouvelle vidéo à sous-titrer": {
+      "main": [
+        [
+          {
+            "node": "Extraire le client du titre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire le client du titre": {
+      "main": [
+        [
+          {
+            "node": "Chercher le client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client connu ?": {
+      "main": [
+        [
+          {
+            "node": "Créer le job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prévenir : marque inconnue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Créer le job": {
+      "main": [
+        [
+          {
+            "node": "Lancer le runner GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retour du runner GitHub": {
+      "main": [
+        [
+          {
+            "node": "Quelle étape ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quelle étape ?": {
+      "main": [
+        [
+          {
+            "node": "Lire le job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rendu reçu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Passer le job en échec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire le job": {
+      "main": [
+        [
+          {
+            "node": "Lire le client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rendu reçu": {
+      "main": [
+        [
+          {
+            "node": "Combiner rendu et contrôle",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Garder 2 captures",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire le client": {
+      "main": [
+        [
+          {
+            "node": "Préparer la tâche",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer la tâche": {
+      "main": [
+        [
+          {
+            "node": "Agent sous-titrage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent sous-titrage": {
+      "main": [
+        [
+          {
+            "node": "Lancer le rendu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format subs.json": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Agent sous-titrage",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combiner rendu et contrôle": {
+      "main": [
+        [
+          {
+            "node": "Décision du contrôle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent contrôle qualité": {
+      "main": [
+        [
+          {
+            "node": "Combiner rendu et contrôle",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Format décision": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Agent contrôle qualité",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Décision du contrôle": {
+      "main": [
+        [
+          {
+            "node": "Rendu approuvé",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Relancer le rendu corrigé",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rendu approuvé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déposer la vidéo sous-titrée": {
+      "main": [
+        [
+          {
+            "node": "Attendre les deux dépôts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déposer le .srt": {
+      "main": [
+        [
+          {
+            "node": "Attendre les deux dépôts",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Attendre les deux dépôts": {
+      "main": [
+        [
+          {
+            "node": "Passer le job en revue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chercher le client": {
+      "main": [
+        [
+          {
+            "node": "Trouver le client dans le titre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trouver le client dans le titre": {
+      "main": [
+        [
+          {
+            "node": "Client connu ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rendu approuvé": {
+      "main": [
+        [
+          {
+            "node": "Télécharger la vidéo",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Télécharger le .srt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Télécharger la vidéo": {
+      "main": [
+        [
+          {
+            "node": "Déposer la vidéo sous-titrée",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Télécharger le .srt": {
+      "main": [
+        [
+          {
+            "node": "Déposer le .srt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Passer le job en revue": {
+      "main": [
+        [
+          {
+            "node": "Lire le client pour le mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire le client pour le mail": {
+      "main": [
+        [
+          {
+            "node": "Prévenir : à valider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Passer le job en échec": {
+      "main": [
+        [
+          {
+            "node": "Alerte rendu en échec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prévenir : marque inconnue": {
+      "main": [
+        [
+          {
+            "node": "Lire la réponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire la réponse": {
+      "main": [
+        [
+          {
+            "node": "Décision du mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Décision du mail": {
+      "main": [
+        [
+          {
+            "node": "Génération arrêtée",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Style par défaut retenu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Préparer le style du client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Style par défaut retenu": {
+      "main": [
+        [
+          {
+            "node": "Créer le job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer le style du client": {
+      "main": [
+        [
+          {
+            "node": "Créer le client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Créer le client": {
+      "main": [
+        [
+          {
+            "node": "Nouveau client retenu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nouveau client retenu": {
+      "main": [
+        [
+          {
+            "node": "Créer le job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Garder 2 captures": {
+      "main": [
+        [
+          {
+            "node": "Agent contrôle qualité",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude sous-titrage": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent sous-titrage",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude contrôle qualité": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent contrôle qualité",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prévenir : à valider": {
+      "main": [
+        [
+          {
+            "node": "Vidéo approuvée ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vidéo approuvée ?": {
+      "main": [
+        [
+          {
+            "node": "Job approuvé",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Job refusé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "versionId": "e075e0db-30bc-4e6a-9a9e-64ccc0c57457",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "nodeGroups": [
+    {
+      "id": "b66ca66a-9c57-4105-aa9d-3cd132684f97",
+      "name": "Lancer le sous-titrage",
+      "nodeIds": [
+        "174d4807-603b-4707-a22f-8643a89db11d",
+        "7092755f-3b81-43f7-b33a-901f2ec8350f",
+        "cb5661c1-9c45-4ce0-bc93-935733d06dd3",
+        "d0e1ced8-4869-4647-b4f3-9a9d9c7dcee2",
+        "8bbe58f2-d8f7-4dae-b893-425793026dd9",
+        "3166dd07-2b45-424d-a660-52cf16488b17",
+        "28d6e15e-a1a0-45c6-b922-8efc8691daf1",
+        "ef3f6ed2-0e8f-45e5-8df9-013a31f92593",
+        "2ae53b29-3ec6-4c08-b375-90eddb15e34d",
+        "fc1f3728-3882-4f3f-bb1f-6e4980bc9b90",
+        "a49bce6a-2bee-41d4-a384-ad49261720e5",
+        "820135c2-867a-4061-9048-f551415e4baa",
+        "853f3364-c8ce-4240-95ec-85df843049f6",
+        "8d82ca6c-5760-4681-abcd-8df24f6d8969"
+      ],
+      "description": "Marque lue dans le titre ; si inconnue, mail de choix (défaut, créer un style, arrêter) ; sinon crée le job et lance la transcription."
+    },
+    {
+      "id": "50999e2a-fc78-4a8d-a687-9f5326388171",
+      "name": "Écrire les sous-titres",
+      "nodeIds": [
+        "ce29c81f-fe75-4a18-a40e-02c059482c50",
+        "31540d79-122d-474b-90d1-14433136f8a1",
+        "b4ce3cdd-2c4c-4136-9b68-30595f24e5bc",
+        "32209e13-fffe-426c-919f-e4f81b19e142",
+        "76c5ffbb-4235-4445-be1e-37991a623e18",
+        "1954ad00-19c7-4632-836a-9a851c136fab",
+        "b80fe3ef-ec06-4070-8df9-9443f89d8658"
+      ],
+      "description": "Après la transcription ou une relecture refusée, l’agent corrige, découpe et stylise selon le client, puis lance le rendu"
+    },
+    {
+      "id": "767c220c-0d13-4d0a-81f1-3773b0797b0f",
+      "name": "Contrôler le rendu",
+      "nodeIds": [
+        "ef1204ad-7b9d-4e46-9540-5034776d94db",
+        "7edde671-1699-4d10-a978-0f7e8a80ac1c",
+        "314af1dc-5401-40aa-be98-3639178a7462",
+        "2eeb0c71-b102-46f1-bdad-aafff21d4e7f",
+        "6508dd58-aa1e-4cdb-9d25-9315769e7dbd",
+        "e257fbd1-c384-4b5b-9f58-6db72f606be1",
+        "9eafb797-4e0e-4ddd-b3d0-d7c0c52c5ddb"
+      ],
+      "description": "2 captures contrôlées : validé, ou 1 seule reprise avec corrections ; après la reprise, le rendu va à la validation"
+    },
+    {
+      "id": "60fe7467-05d5-4aef-9b68-00907cb1c62e",
+      "name": "Signaler un échec",
+      "nodeIds": [
+        "9dee5e5e-fdbf-486c-aa4c-7db28e1b4702",
+        "705eaa1c-c034-44b8-93b1-296b4bf76d79"
+      ],
+      "description": "Runner en erreur ou réponse du contrôle inexploitable : mail d'échec et job marqué en échec"
+    },
+    {
+      "id": "a914a85a-7e9b-4ddb-8a4f-601bdd1b2958",
+      "name": "Déposer pour validation",
+      "nodeIds": [
+        "f7c1d1b0-7a40-43ef-8de6-df71d7fdc515",
+        "ca14226b-9031-43b2-bc51-e3de6d6ca178",
+        "68f436dd-c2ac-4a5f-903e-59dbc7033e02",
+        "1fa38a55-4be7-45d6-92e1-c65153024be0",
+        "be1db9cb-40d8-4a4c-af78-7dee1bcfcdf9",
+        "83933351-d6ab-4757-bb94-cb1f6261d13c",
+        "72b60f66-7d85-4786-8667-1e4cce6b8591",
+        "6086d944-c648-4e31-886f-bc349d3ea956",
+        "76b46193-2ad6-455f-a385-a4d5fdd2a349",
+        "37eb7ac8-fc59-4842-b16c-f07497f2fdd9",
+        "d02d1f17-c5b2-46eb-8eab-42cd57462d07",
+        "8911fe72-f508-4e46-adce-1210affbfb82"
+      ],
+      "description": "Dépose dans Drive « Valider », mail avec boutons Approuver / Refuser, puis job approuvé ou refusé"
+    }
+  ],
+  "id": "vzEHTnh9m6datRMY",
+  "tags": []
+}
