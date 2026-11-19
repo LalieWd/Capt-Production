@@ -1,76 +1,112 @@
 {
-  "client": "Genre : karaoké (le mot prononcé s'allume)",
   "code": "KARAOKE",
   "genre": "karaoke",
-  "version": "1.1",
+  "ombre": {
+    "active": true,
+    "taille": "small",
+    "couleur": "#000000",
+    "flou_px": 4,
+    "opacite": 0.5,
+    "decalage_px": 2
+  },
+  "client": "Genre : karaoké (le mot prononcé s'allume)",
+  "impact": {
+    "echelle": 1.35,
+    "police_gras": {
+      "b": 1,
+      "famille": "Halyard Display"
+    },
+    "effets_defaut": [
+      "gras",
+      "agrandi"
+    ],
+    "effets_autorises": [
+      "gras",
+      "agrandi"
+    ]
+  },
+  "police": {
+    "casse": "phrase",
+    "famille": "Halyard Display",
+    "fichier": "fonts/HalyardDisplay-Medium.otf",
+    "graisse": "Medium",
+    "nom_ass": "Halyard Display Medium",
+    "fallback": "Inter Medium",
+    "taille_px": 62,
+    "taille_em_px": 62.5,
+    "famille_mot_cle": "Halyard Display",
+    "graisse_mot_cle": "Medium",
+    "fichier_fallback": "fonts/Inter-Medium.otf"
+  },
+  "contenu": {
+    "emojis": false,
+    "ponctuation": true,
+    "chiffres_en_chiffres": true,
+    "espace_insecable_avant": "?!:;",
+    "affichage_pendant_silences": true
+  },
+  "contour": null,
+  "version": "2.0",
+  "couleurs": {
+    "texte": "#FFFFFF",
+    "texte_inactif": "#B8B8B8",
+    "fond_mot_cle": null,
+    "mot_cle_accent": "#FFD400",
+    "mot_cle_principal": "#FFFFFF",
+    "mot_cle_secondaire": "#FFFFFF"
+  },
+  "animation": {
+    "mot": "karaoke",
+    "bloc": "aucune",
+    "mode": "karaoke",
+    "duree_fade_ms": 120,
+    "remplacement_bloc": "coupe_seche"
+  },
+  "mots_cles": {
+    "gras": false,
+    "actif": true,
+    "types": [
+      "blanc",
+      "bleu"
+    ],
+    "echelle": 1.4,
+    "frequence": "environ 1 bloc sur 4",
+    "max_par_bloc": 3,
+    "bleu_max_par_bloc": 2,
+    "rotation_couleurs": [
+      "mot_cle_principal",
+      "mot_cle_accent"
+    ]
+  },
   "resolution": [
     1080,
     1920
   ],
-  "police": {
-    "famille": "Inter",
-    "graisse": "Bold",
-    "fichier": null,
-    "fallback": "Inter",
-    "taille_px": 72,
-    "casse": "majuscules",
-    "gras": true
-  },
-  "couleurs": {
-    "texte": "#FFFFFF",
-    "texte_inactif": "#B8B8B8",
-    "mot_cle_principal": "#FFFFFF",
-    "mot_cle_secondaire": "#FFFFFF",
-    "mot_cle_accent": "#FFD400"
-  },
-  "contour": {
-    "couleur": "#000000",
-    "epaisseur_px": 7
-  },
-  "ombre": {
-    "active": false,
-    "couleur": "#000000",
-    "opacite": 0.6,
-    "decalage_px": 2,
-    "flou_px": 2
-  },
   "mise_en_page": {
-    "centre_x_px": 540,
-    "centre_bloc_y_px": 1380,
-    "largeur_max_px": 840,
+    "ancrage": "premiere_ligne",
+    "alignement": "centre",
+    "interligne": 1.15,
     "lignes_max": 2,
-    "mots_max_par_bloc": 3,
-    "interligne": 1.0
+    "centre_x_px": 540,
+    "retour_ligne": true,
+    "largeur_max_px": 860,
+    "centre_bloc_y_px": 1488,
+    "mots_max_par_bloc": 9,
+    "ecart_baselines_px": 72,
+    "baseline_ligne1_y_px": 1488,
+    "mots_cibles_par_bloc": "4-8"
   },
-  "mots_cles": {
-    "actif": false,
-    "echelle": 1.2,
-    "max_par_bloc": 1,
-    "frequence": "environ 1 bloc sur 2"
-  },
-  "animation": {
-    "mode": "karaoke",
-    "duree_fade_ms": 120
-  },
-  "contenu": {
-    "emojis": false,
-    "ponctuation": true
-  },
-  "glossaire": [],
-  "format": "mobile_9_16",
-  "zone_sure": {
-    "haut_px": 250,
-    "bas_px": 420,
-    "cotes_px": 120
-  },
-  "impact": {
-    "effets_autorises": [
-      "agrandi"
-    ],
-    "effets_defaut": [
-      "agrandi"
-    ],
-    "echelle": 1.3
-  },
-  "mesure_exacte": true
+  "genres_autorises": [
+    "corporate",
+    "impact",
+    "karaoke"
+  ],
+  "genre_regles": {
+    "animation": {
+      "mode": "karaoke"
+    },
+    "couleurs": {
+      "mot_cle_accent": "{accent}"
+    }
+  }
 }

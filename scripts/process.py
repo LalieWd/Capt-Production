@@ -621,7 +621,7 @@ def marquer_impact(mots, impact, cfg):
 
 
 def blocs_depuis_subs(subs, style):
-    """Transforme les sous-titres de n8n [{start, end, text, highlight?}] en blocs pour render (mots chronometres)."""
+    """Transforme les sous-titres de n8n [{start, end, text, highlight?, accent?, impact?, genre?}] en blocs pour render (mots chronometres)."""
     blocs = []
     cfg_impact = render.reglages_impact(style)
     for s in sorted(subs, key=lambda x: float(x["start"])):
@@ -639,22 +639,24 @@ def blocs_depuis_subs(subs, style):
             mots.append({"mot": jeton, "debut": t0, "fin": t1, "cle": None})
             t0 = t1
         surligner = {m for h in (s.get("highlight") or []) for m in render.normaliser(str(h)).split()}
-        accent = {m for h in (s.get("highlight_accent") or []) for m in render.normaliser(str(h)).split()}
+        accentues = {m for h in (s.get("accent") or []) for m in render.normaliser(str(h)).split()}
         for m in mots:
             n = render.normaliser(m["mot"])
-            if n in accent:
-                m["cle"] = "accent"          # mot-cle dans la couleur d'accentuation de la marque
+            if n in accentues:
+                m["cle"] = "accent"       # couleur d'accentuation de la marque (bleu pour Mazars)
             elif n in surligner:
                 m["cle"] = "principal"
         marquer_impact(mots, s.get("impact"), cfg_impact)
         blocs.append({"debut": debut, "fin": fin, "mots": mots, "genre": genre_du_sous_titre(s)})
-    # temps de lecture : un sous-titre reste affiche ~0,9 s + 0,055 s par caractere (dans la limite du suivant)
+    render.limiter_impact(blocs, style)
+    blocs = render.couper_blocs_trop_longs(blocs, style)   # rien ne doit depasser du cadre du style
+    # Temps de lecture : le bloc reste affiche ~0,8 s + 0,06 s par caractere (au plus 1,5 s apres la voix),
+    # dans la limite du debut du bloc suivant.
     for i, b in enumerate(blocs):
         nb_car = len(" ".join(m["mot"] for m in b["mots"]))
-        cible = b["debut"] + 0.9 + 0.055 * nb_car
-        if i + 1 < len(blocs):
-            cible = min(cible, blocs[i + 1]["debut"] - 0.04)
-        b["fin"] = max(b["fin"], cible)
+        voulu = min(b["debut"] + 0.8 + 0.06 * nb_car, b["fin"] + 1.5)
+        limite = blocs[i + 1]["debut"] - 0.04 if i + 1 < len(blocs) else voulu
+        b["fin"] = max(b["fin"], min(voulu, limite))
     for prev, cur in zip(blocs, blocs[1:]):               # jamais de chevauchement
         if cur["debut"] < prev["fin"] + 0.02:
             prev["fin"] = max(prev["debut"] + 0.1, cur["debut"] - 0.02)
@@ -665,6 +667,51 @@ def blocs_depuis_subs(subs, style):
     render.limiter_impact(blocs, style)
     render.limiter_mots_cles(blocs, style)
     return blocs
+
+
+def mesurer_luminosite(video, blocs, style):
+    """Luminosite (0 a 1) du fond derriere le texte, au milieu de chaque sous-titre : on prend le quart le plus clair de la
+    zone du texte. Sert a ajouter un contour sombre quand le fond est clair (regle de lisibilite). Ne bloque jamais le rendu."""
+    ml, res_h = style["mise_en_page"], style["resolution"][1]
+    cy = ml.get("baseline_ligne1_y_px", ml["centre_bloc_y_px"]) + 30
+    y0 = max(0.0, (cy - 110) / res_h)
+    h = min(220 / res_h, 1 - y0)
+    vf = f"crop=iw*0.8:ih*{h:.4f}:iw*0.1:ih*{y0:.4f},scale=16:4,format=gray"
+    for b in blocs:
+        t = (b["debut"] + b["fin"]) / 2
+        try:
+            r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", video, "-frames:v", "1", "-vf", vf,
+                                "-f", "rawvideo", "-"], capture_output=True, timeout=60)
+            px = sorted(r.stdout)
+            if px:
+                b["lum"] = sum(px[len(px) * 3 // 4:]) / max(len(px) - len(px) * 3 // 4, 1) / 255.0
+                b["lum_moy"] = sum(px) / len(px) / 255.0
+        except Exception:
+            pass
+
+
+def choisir_couleur_texte(blocs, style):
+    """Texte noir ou blanc : on calcule, pour chaque sous-titre, le contraste (norme WCAG) du blanc et du noir sur le fond
+    mesure, puis on garde la couleur dont la MOYENNE de contraste sur toute la video est la plus elevee.
+    Desactivable par style["texte_auto"] = false. Modifie le style en place, renvoie un message pour le compte rendu."""
+    if style.get("texte_auto", True) is False:
+        return None
+    lums = [b["lum_moy"] for b in blocs if b.get("lum_moy") is not None]
+    if not lums:
+        return None
+
+    def lin(v):
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    ys = [lin(v) for v in lums]
+    blanc = sum(1.05 / (y + 0.05) for y in ys) / len(ys)
+    noir = sum((y + 0.05) / 0.05 for y in ys) / len(ys)
+    c = style["couleurs"]
+    if noir > blanc:
+        c["texte"], c["mot_cle_principal"], c["mot_cle_secondaire"], c["texte_inactif"] = "#000000", "#000000", "#000000", "#4A4A4A"
+        style["_texte_noir"] = True
+    else:
+        c["texte"], c["mot_cle_principal"], c["mot_cle_secondaire"] = "#FFFFFF", "#FFFFFF", "#FFFFFF"
+    return f"contraste moyen blanc {blanc:.1f} / noir {noir:.1f} -> texte {'noir' if noir > blanc else 'blanc'}"
 
 
 def captures(video, blocs, sortie, n=6):
@@ -696,8 +743,18 @@ def phase_rendu(video, nom_video, client_saisi, sortie, subs_json, style_json):
     if largeur > style["resolution"][0]:
         hauteur = int(round(hauteur * style["resolution"][0] / largeur / 2) * 2)
         largeur = style["resolution"][0]
+    modeles = charger_modeles_genres()
+    # par defaut, TOUTES les marques heritent des genres du modele
+    style.setdefault("genres_autorises", ["corporate", "impact", "karaoke"])
+    if "impact" not in style and modeles.get("impact", {}).get("impact"):
+        style["impact"] = render._remplacer(modeles["impact"]["impact"], render._variables_style(style))
     blocs = blocs_depuis_subs(subs, style)
-    ass = render.generer_ass(blocs, style, largeur, hauteur, nom_police, [], DOSSIER_POLICES, charger_modeles_genres())
+    mesurer_luminosite(video, blocs, style)      # fond clair derriere le texte : contour sombre automatique
+    choix = choisir_couleur_texte(blocs, style)  # texte noir ou blanc selon le meilleur contraste moyen
+    if choix:
+        print(choix)
+        alertes.append(choix)
+    ass = render.generer_ass(blocs, style, largeur, hauteur, nom_police, [], DOSSIER_POLICES, modeles)
     open(os.path.join(sortie, "subtitles.ass"), "w", encoding="utf-8").write(ass)
     open(os.path.join(sortie, "subtitles.srt"), "w", encoding="utf-8").write(render.generer_srt(blocs))
 
