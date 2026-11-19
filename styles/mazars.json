@@ -117,5 +117,9 @@
       "famille": "Halyard Display",
       "b": 1
     }
-  }
+  },
+  "genres_autorises": [
+    "corporate",
+    "impact"
+  ]
 }

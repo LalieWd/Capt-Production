@@ -49,7 +49,7 @@
     "texte": "#FFFFFF",
     "texte_inactif": "#B8B8B8",
     "fond_mot_cle": null,
-    "mot_cle_accent": "#5229E7",
+    "mot_cle_accent": "#9D86FF",
     "mot_cle_principal": "#FFFFFF",
     "mot_cle_secondaire": "#FFFFFF"
   },
@@ -97,8 +97,7 @@
   },
   "genres_autorises": [
     "corporate",
-    "impact",
-    "karaoke"
+    "impact"
   ],
   "mesure_exacte": true
 }

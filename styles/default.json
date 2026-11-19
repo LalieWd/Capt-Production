@@ -41,16 +41,13 @@
     "espace_insecable_avant": "?!:;",
     "affichage_pendant_silences": true
   },
-  "contour": {
-    "couleur": "#000000",
-    "epaisseur_px": 5
-  },
+  "contour": null,
   "version": "2.0",
   "couleurs": {
     "texte": "#FFFFFF",
     "texte_inactif": "#B8B8B8",
     "fond_mot_cle": null,
-    "mot_cle_accent": "#FFD400",
+    "mot_cle_accent": "#000000",
     "mot_cle_principal": "#FFFFFF",
     "mot_cle_secondaire": "#FFFFFF"
   },
@@ -98,8 +95,7 @@
   },
   "genres_autorises": [
     "corporate",
-    "impact",
-    "karaoke"
+    "impact"
   ],
   "mesure_exacte": true
 }

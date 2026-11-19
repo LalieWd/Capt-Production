@@ -42,7 +42,10 @@
     "espace_insecable_avant": "?!:;",
     "affichage_pendant_silences": true
   },
-  "contour": null,
+  "contour": {
+    "couleur": "#000000",
+    "epaisseur_px": 5
+  },
   "version": "2.0",
   "couleurs": {
     "texte": "#FFFFFF",
@@ -96,8 +99,7 @@
   },
   "genres_autorises": [
     "corporate",
-    "impact",
-    "karaoke"
+    "impact"
   ],
   "mesure_exacte": true,
   "lueur_mots_cles": {

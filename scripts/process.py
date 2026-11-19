@@ -648,7 +648,10 @@ def blocs_depuis_subs(subs, style):
             elif n in surligner:
                 m["cle"] = "principal"
         marquer_impact(mots, s.get("impact"), cfg_impact)
-        blocs.append({"debut": debut, "fin": fin, "mots": mots, "genre": genre_du_sous_titre(s)})
+        genre = genre_du_sous_titre(s)
+        if genre and genre not in (style.get("genres_autorises") or render.GENRES):
+            genre = None                      # genre non autorise pour ce style (ex. karaoke retire) : style de base
+        blocs.append({"debut": debut, "fin": fin, "mots": mots, "genre": genre})
     render.limiter_impact(blocs, style)
     blocs = render.couper_blocs_trop_longs(blocs, style)   # rien ne doit depasser du cadre du style
     # Temps de lecture : le bloc reste affiche ~0,8 s + 0,06 s par caractere (au plus 1,5 s apres la voix),
