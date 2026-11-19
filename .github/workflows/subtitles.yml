@@ -96,15 +96,25 @@ jobs:
       - name: Installer FFmpeg
         timeout-minutes: 8
         run: |
-          # L'installation bloquait parfois plusieurs minutes : delai par essai, 3 essais, puis echec net.
+          # apt bloquait des minutes sur un miroir Ubuntu lent : on telecharge un FFmpeg statique depuis GitHub
+          # (3 essais de 120 s max), et apt ne sert plus que de secours.
+          ok=0
           for i in 1 2 3; do
-            if timeout 150 bash -c 'sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 update -y && sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 install -y ffmpeg fonts-inter fonts-dejavu-core'; then
+            rm -rf /tmp/ff /tmp/ff.tar.xz
+            if timeout 120 bash -c 'curl -fsSL --connect-timeout 15 -o /tmp/ff.tar.xz https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz && mkdir -p /tmp/ff && tar -xf /tmp/ff.tar.xz -C /tmp/ff --strip-components=1'; then
+              sudo install -m 755 /tmp/ff/bin/ffmpeg /usr/local/bin/ffmpeg
+              sudo install -m 755 /tmp/ff/bin/ffprobe /usr/local/bin/ffprobe
+              ok=1
               break
             fi
-            echo "Installation de FFmpeg : essai $i echoue"
-            if [ "$i" = 3 ]; then exit 1; fi
-            sleep 5
+            echo "Telechargement de FFmpeg : essai $i echoue"
+            sleep 3
           done
+          if [ "$ok" != 1 ]; then
+            echo "Secours : installation par apt"
+            timeout 180 bash -c 'sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 update -y && sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 install -y ffmpeg fonts-dejavu-core'
+          fi
+          ffmpeg -hide_banner -filters | grep -q " ass " && ffmpeg -hide_banner -encoders | grep -q libx264
 
       - name: Se connecter a Google (sans cle)
         id: google
