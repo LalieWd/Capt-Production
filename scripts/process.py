@@ -639,11 +639,22 @@ def blocs_depuis_subs(subs, style):
             mots.append({"mot": jeton, "debut": t0, "fin": t1, "cle": None})
             t0 = t1
         surligner = {m for h in (s.get("highlight") or []) for m in render.normaliser(str(h)).split()}
+        accent = {m for h in (s.get("highlight_accent") or []) for m in render.normaliser(str(h)).split()}
         for m in mots:
-            if render.normaliser(m["mot"]) in surligner:
+            n = render.normaliser(m["mot"])
+            if n in accent:
+                m["cle"] = "accent"          # mot-cle dans la couleur d'accentuation de la marque
+            elif n in surligner:
                 m["cle"] = "principal"
         marquer_impact(mots, s.get("impact"), cfg_impact)
         blocs.append({"debut": debut, "fin": fin, "mots": mots, "genre": genre_du_sous_titre(s)})
+    # temps de lecture : un sous-titre reste affiche ~0,9 s + 0,055 s par caractere (dans la limite du suivant)
+    for i, b in enumerate(blocs):
+        nb_car = len(" ".join(m["mot"] for m in b["mots"]))
+        cible = b["debut"] + 0.9 + 0.055 * nb_car
+        if i + 1 < len(blocs):
+            cible = min(cible, blocs[i + 1]["debut"] - 0.04)
+        b["fin"] = max(b["fin"], cible)
     for prev, cur in zip(blocs, blocs[1:]):               # jamais de chevauchement
         if cur["debut"] < prev["fin"] + 0.02:
             prev["fin"] = max(prev["debut"] + 0.1, cur["debut"] - 0.02)
