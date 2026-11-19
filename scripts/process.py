@@ -623,6 +623,7 @@ def marquer_impact(mots, impact, cfg):
 def blocs_depuis_subs(subs, style):
     """Transforme les sous-titres de n8n [{start, end, text, highlight?}] en blocs pour render (mots chronometres)."""
     blocs = []
+    nb_cles = 0
     cfg_impact = render.reglages_impact(style)
     for s in sorted(subs, key=lambda x: float(x["start"])):
         texte = " ".join(str(s.get("text", "")).split())
@@ -641,12 +642,21 @@ def blocs_depuis_subs(subs, style):
         surligner = {m for h in (s.get("highlight") or []) for m in render.normaliser(str(h)).split()}
         for m in mots:
             if render.normaliser(m["mot"]) in surligner:
-                m["cle"] = "principal"
+                # un mot-cle sur deux prend la couleur d'accentuation de la marque, les autres restent principaux
+                m["cle"] = "accent" if nb_cles % 2 == 1 else "principal"
+                nb_cles += 1
         marquer_impact(mots, s.get("impact"), cfg_impact)
         blocs.append({"debut": debut, "fin": fin, "mots": mots, "genre": genre_du_sous_titre(s)})
     for prev, cur in zip(blocs, blocs[1:]):               # jamais de chevauchement
         if cur["debut"] < prev["fin"] + 0.02:
             prev["fin"] = max(prev["debut"] + 0.1, cur["debut"] - 0.02)
+    # Lisibilite : le texte reste a l'ecran au moins 1 s et le temps de le lire (~14 caracteres par seconde),
+    # et 0,4 s apres le dernier mot, sans empieter sur le bloc suivant.
+    for i, b in enumerate(blocs):
+        nb_car = sum(len(m["mot"]) for m in b["mots"]) + max(len(b["mots"]) - 1, 0)
+        cible = max(b["fin"] + 0.4, b["debut"] + max(1.0, nb_car / 14.0))
+        limite = blocs[i + 1]["debut"] - 0.02 if i + 1 < len(blocs) else b["fin"] + 1.0
+        b["fin"] = max(b["fin"], min(cible, limite))
     if not style.get("contenu", {}).get("ponctuation", True):
         for b in blocs:
             for m in b["mots"]:
