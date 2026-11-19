@@ -669,6 +669,26 @@ def blocs_depuis_subs(subs, style):
     return blocs
 
 
+def mesurer_luminosite(video, blocs, style):
+    """Luminosite (0 a 1) du fond derriere le texte, au milieu de chaque sous-titre : on prend le quart le plus clair de la
+    zone du texte. Sert a ajouter un contour sombre quand le fond est clair (regle de lisibilite). Ne bloque jamais le rendu."""
+    ml, res_h = style["mise_en_page"], style["resolution"][1]
+    cy = ml.get("baseline_ligne1_y_px", ml["centre_bloc_y_px"]) + 30
+    y0 = max(0.0, (cy - 110) / res_h)
+    h = min(220 / res_h, 1 - y0)
+    vf = f"crop=iw*0.8:ih*{h:.4f}:iw*0.1:ih*{y0:.4f},scale=16:4,format=gray"
+    for b in blocs:
+        t = (b["debut"] + b["fin"]) / 2
+        try:
+            r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", video, "-frames:v", "1", "-vf", vf,
+                                "-f", "rawvideo", "-"], capture_output=True, timeout=60)
+            px = sorted(r.stdout)
+            if px:
+                b["lum"] = sum(px[len(px) * 3 // 4:]) / max(len(px) - len(px) * 3 // 4, 1) / 255.0
+        except Exception:
+            pass
+
+
 def captures(video, blocs, sortie, n=6):
     """Jusqu'a n images de la video rendue, prises au milieu de blocs repartis sur la duree."""
     if not blocs:
@@ -699,6 +719,7 @@ def phase_rendu(video, nom_video, client_saisi, sortie, subs_json, style_json):
         hauteur = int(round(hauteur * style["resolution"][0] / largeur / 2) * 2)
         largeur = style["resolution"][0]
     blocs = blocs_depuis_subs(subs, style)
+    mesurer_luminosite(video, blocs, style)      # fond clair derriere le texte : contour sombre automatique
     ass = render.generer_ass(blocs, style, largeur, hauteur, nom_police, [], DOSSIER_POLICES, charger_modeles_genres())
     open(os.path.join(sortie, "subtitles.ass"), "w", encoding="utf-8").write(ass)
     open(os.path.join(sortie, "subtitles.srt"), "w", encoding="utf-8").write(render.generer_srt(blocs))
