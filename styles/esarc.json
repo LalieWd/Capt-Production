@@ -96,7 +96,8 @@
   },
   "genres_autorises": [
     "corporate",
-    "impact"
+    "impact",
+    "karaoke"
   ],
   "mesure_exacte": true
 }
