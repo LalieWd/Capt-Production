@@ -148,7 +148,10 @@ def mesurer(texte, style):
         return None
     cle = (f, taille_ass(style["police"]))
     if cle not in _MESURES:
-        from PIL import ImageFont
+        try:
+            from PIL import ImageFont
+        except ImportError:
+            return None
         ft = ImageFont.truetype(f, 200)
         asc, desc = ft.getmetrics()
         _MESURES[cle] = (ft, taille_ass(style["police"]) / ((asc + desc) / 200) / 200)   # px par unite de ft.getlength
@@ -156,9 +159,34 @@ def mesurer(texte, style):
     return ft.getlength(texte) * k
 
 
+def _pil_dispo():
+    try:
+        import PIL  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def mesure_active(style):
+    """Mesure reelle du texte avec la police du style. Explicite via « mesure_exacte » ; sinon automatique des que
+    la police n'a pas le meme rapport taille ASS / taille reelle que Halyard (1,377), sur lequel l'estimation historique
+    est calee : sans cela, Circular Std ou Inter Tight sont sous-estimees de 15 a 40 % et les lignes debordent."""
+    f = police_mesure(style)
+    if not f:
+        return False
+    if style.get("mesure_exacte") is not None:
+        return bool(style["mesure_exacte"]) and _pil_dispo()
+    if not _pil_dispo():
+        return False
+    from PIL import ImageFont
+    ft = ImageFont.truetype(f, 200)
+    asc, desc = ft.getmetrics()
+    return abs((asc + desc) / 200 - 1.377) > 0.05
+
+
 def largeur_ligne(mots, style, taille):
-    """Largeur d'une ligne : mesure reelle si le style le demande (mesure_exacte), sinon estimation historique."""
-    if style.get("mesure_exacte") and police_mesure(style):
+    """Largeur d'une ligne : mesure reelle si active (voir mesure_active), sinon estimation historique."""
+    if mesure_active(style):
         maj = style["police"].get("casse") == "majuscules"
         total = 0.0
         for i, w in enumerate(mots):
@@ -324,6 +352,32 @@ GENRES = ("corporate", "impact", "karaoke")
 GRIS_INACTIF = "#B8B8B8"
 
 
+def _variables_style(style):
+    c = style["couleurs"]
+    return {"{accent}": c.get("mot_cle_accent") or c["texte"], "{texte}": c["texte"],
+            "{principal}": c.get("mot_cle_principal") or c["texte"]}
+
+
+def _remplacer(o, v):
+    if isinstance(o, str):
+        for k, val in v.items():
+            o = o.replace(k, val)
+        return o
+    if isinstance(o, dict):
+        return {k: _remplacer(x, v) for k, x in o.items()}
+    if isinstance(o, list):
+        return [_remplacer(x, v) for x in o]
+    return o
+
+
+def _fusion(base, surcharge):
+    for k, x in surcharge.items():
+        if isinstance(x, dict) and isinstance(base.get(k), dict):
+            _fusion(base[k], x)
+        else:
+            base[k] = x
+
+
 def style_genre(style, genre, modele=None):
     """Style de la marque habille d'un genre (corporate / impact / karaoke) choisi par l'agent pour un sous-titre.
     La police, les couleurs et la position de la marque sont conservees ; le genre change l'animation, la casse,
@@ -337,12 +391,16 @@ def style_genre(style, genre, modele=None):
     st["animation"] = dict(st["animation"], mode=ma.get("mode") or {"corporate": "progressive", "impact": "pop", "karaoke": "karaoke"}[genre],
                            duree_fade_ms=ma.get("duree_fade_ms", st["animation"].get("duree_fade_ms", 150)))
     p = st["police"]
+    # Regles du genre definies UNE fois dans le modele (Clients corporate / impact / karaoke, cle "genre_regles"),
+    # avec des variables {accent} {texte} {principal} remplacees par celles de la marque : valables pour toutes les marques.
+    regles = _remplacer(modele.get("genre_regles") or {}, _variables_style(st))
+    echelle_taille = (regles.get("police") or {}).pop("echelle_taille", None)
     if genre == "corporate":
         p["casse"] = "phrase"
     elif genre == "impact":
         p["casse"] = "majuscules"
         p["gras"] = True
-        ratio = 1.1
+        ratio = echelle_taille or 1.1
         if "taille_em_px" in p:
             p["taille_em_px"] = p["taille_em_px"] * ratio
         else:
@@ -352,6 +410,7 @@ def style_genre(style, genre, modele=None):
         if c.get("texte_inactif", c["texte"]).upper() == c["texte"].upper():
             c["texte_inactif"] = GRIS_INACTIF
         c["mot_cle_accent"] = couleur_impact(st, reglages_impact(st))
+    _fusion(st, regles)
     return st
 
 
@@ -432,6 +491,74 @@ def preparer_impact_ligne(ligne, style, taille):
                 w["impact_echelle"] = reduit
 
 
+def _tient(mots, style_bloc, taille):
+    """Vrai si le bloc tient dans lignes_max lignes de largeur_max_px (impacts et mots cles compris)."""
+    ml = style_bloc["mise_en_page"]
+    for w in mots:
+        w.setdefault("facteur_largeur", 1.0)
+    preparer_impact_ligne(mots, dict(style_bloc, mise_en_page=dict(ml, largeur_max_px=10 ** 6)), taille)
+    if len(mots) > cible_mots(ml)[2]:
+        return False
+    return all(largeur_ligne(l, style_bloc, taille) <= ml["largeur_max_px"] for l in repartir_lignes(mots, style_bloc)) \
+        and len(repartir_lignes(mots, style_bloc)) <= ml["lignes_max"]
+
+
+def couper_blocs_trop_longs(blocs, style):
+    """Un sous-titre qui ne tient pas dans le cadre (largeur_max_px x lignes_max, ou plus de mots que le plafond du style)
+    est coupe en deux, a la ponctuation ou a la pause la plus proche du milieu, jusqu'a ce que chaque morceau tienne.
+    Le temps de chaque mot est conserve."""
+    taille = taille_em(style["police"]) * 1.056
+    res = []
+
+    def traiter(b):
+        st = style_genre(style, b.get("genre")) if b.get("genre") in GENRES else style
+        mots = b["mots"]
+        if len(mots) < 2 or _tient(mots, st, taille):
+            res.append(b)
+            return
+        meilleur, score = None, None
+        for k in range(1, len(mots)):
+            a, c = mots[:k], mots[k:]
+            larg = max(largeur_ligne(a, st, taille), largeur_ligne(c, st, taille))
+            fin_phrase = a[-1]["mot"].rstrip()[-1:] in ".?!…,;:"
+            s = larg * (0.9 if fin_phrase else 1.0) * (1.0 if peut_couper_apres(a[-1]) else 1.35)
+            if len(a) == 1 or len(c) == 1:
+                s *= 1.15
+            if score is None or s < score:
+                meilleur, score = k, s
+        a, c = mots[:meilleur], mots[meilleur:]
+        for morceau in (a, c):
+            traiter({"debut": morceau[0]["debut"], "fin": morceau[-1]["fin"], "mots": morceau, "genre": b.get("genre")})
+
+    for b in blocs:
+        traiter(b)
+    return res
+
+
+# ---------- lisibilite : contraste automatique ----------
+LISIBILITE_DEFAUT = {"auto": True, "seuil_1": 0.42, "seuil_2": 0.62, "contour_1_px": 3, "contour_2_px": 5}
+
+
+def tags_lisibilite(style, bloc, k):
+    """Contour sombre ajoute automatiquement quand le fond de la video, derriere le texte, est clair.
+    bloc["lum"] = luminosite (0 a 1) du fond derriere le texte, mesuree par le robot. Regle valable pour toutes les marques :
+    fond moyen (> seuil_1) contour 3 px ; fond clair (> seuil_2) contour 5 px. Jamais moins que le contour du style."""
+    cfg = dict(LISIBILITE_DEFAUT)
+    cfg.update(style.get("lisibilite") or {})
+    lum = bloc.get("lum")
+    if not cfg.get("auto") or lum is None:
+        return ""
+    if style.get("_texte_noir"):                  # texte noir : contour BLANC quand le fond est sombre
+        lm = bloc.get("lum_moy", lum)
+        px = cfg["contour_2_px"] if lm <= 0.2 else cfg["contour_1_px"] if lm <= 0.35 else 0
+        return f"\\bord{px * k:.1f}\\3c&HFFFFFF&" if px else ""
+    px = cfg["contour_2_px"] if lum >= cfg["seuil_2"] else cfg["contour_1_px"] if lum >= cfg["seuil_1"] else 0
+    base = (style.get("contour") or {}).get("epaisseur_px", 0)
+    if px <= base:
+        return ""
+    return f"\\bord{px * k:.1f}\\3c&H000000&"
+
+
 # ---------- sortie ASS ----------
 def generer_ass(blocs, style, largeur, hauteur, nom_police, titres=None, dossier_polices="fonts", modeles_genres=None):
     global _DOSSIER_POLICES
@@ -491,7 +618,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         reduction = 1.0      # styles « mesure_exacte » : le bloc est reduit (70 % au plus) s'il deborde encore
         for ligne in mise_en_page:
             preparer_impact_ligne(ligne, style, taille_calc)
-            if style.get("mesure_exacte"):
+            if mesure_active(style):
                 reduction = min(reduction, max(0.7, ml["largeur_max_px"] / max(largeur_ligne(ligne, style, taille_calc), 1)))
         for ligne in mise_en_page:
             parts = []
@@ -558,13 +685,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             for li, (morceau, ech) in enumerate(zip(morceaux, echelles)):
                 baseline = (ml["baseline_ligne1_y_px"] + li * ml.get("ecart_baselines_px", 72)) * k
                 y = baseline - 0.763 * taille * ech
-                tag = f"\\an8\\pos({cx:.0f},{y:.0f})"
+                tag = f"\\an8\\pos({cx:.0f},{y:.0f})" + tags_lisibilite(style_marque, b, k)
                 if mode == "statique":
                     tag += f"\\fad({fade},{int(fade * .7)})"
                 lignes.append(f"Dialogue: 0,{temps_ass(b['debut'])},{temps_ass(b['fin'])},Defaut,,0,0,0,,{{{tag}}}{morceau}")
             continue
         corps = "\\N".join(morceaux)
-        debut_tag = f"\\an5\\pos({cx:.0f},{cy:.0f})"
+        debut_tag = f"\\an5\\pos({cx:.0f},{cy:.0f})" + tags_lisibilite(style_marque, b, k)
         if mode == "statique":
             debut_tag += f"\\fad({fade},{int(fade * .7)})"
         if ml.get("interligne", 1) != 1:

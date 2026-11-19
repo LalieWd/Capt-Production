@@ -1,0 +1,103 @@
+{
+  "code": "ESARC",
+  "genre": "corporate",
+  "ombre": {
+    "active": true,
+    "taille": "small",
+    "couleur": "#000000",
+    "flou_px": 4,
+    "opacite": 0.5,
+    "decalage_px": 2
+  },
+  "client": "ESARC",
+  "impact": {
+    "echelle": 1.35,
+    "police_gras": {
+      "b": 1,
+      "famille": "Inter"
+    },
+    "effets_defaut": [
+      "gras",
+      "agrandi"
+    ],
+    "effets_autorises": [
+      "gras",
+      "agrandi",
+      "capitales"
+    ]
+  },
+  "police": {
+    "casse": "phrase",
+    "famille": "Inter",
+    "fichier": "fonts/Inter-Bold.otf",
+    "graisse": "Bold",
+    "nom_ass": "Inter Bold",
+    "fallback": "Inter Bold",
+    "taille_px": 72
+  },
+  "contenu": {
+    "emojis": false,
+    "ponctuation": true,
+    "chiffres_en_chiffres": true,
+    "espace_insecable_avant": "?!:;",
+    "affichage_pendant_silences": true
+  },
+  "contour": null,
+  "version": "1.0",
+  "couleurs": {
+    "texte": "#FFFFFF",
+    "texte_inactif": "#B8B8B8",
+    "fond_mot_cle": null,
+    "mot_cle_accent": "#DC6D6D",
+    "mot_cle_principal": "#FFFFFF",
+    "mot_cle_secondaire": "#FFFFFF"
+  },
+  "animation": {
+    "mot": "fade_in",
+    "bloc": "aucune",
+    "mode": "progressive",
+    "duree_fade_ms": 100,
+    "remplacement_bloc": "coupe_seche",
+    "mise_en_page_figee": true
+  },
+  "mots_cles": {
+    "actif": true,
+    "gras": false,
+    "types": [
+      "blanc",
+      "accent"
+    ],
+    "echelle": 1.35,
+    "frequence": "environ 1 bloc sur 2",
+    "max_par_bloc": 3,
+    "bleu_max_par_bloc": 2,
+    "rotation_couleurs": [
+      "mot_cle_principal",
+      "mot_cle_accent"
+    ]
+  },
+  "resolution": [
+    1080,
+    1920
+  ],
+  "mise_en_page": {
+    "ancrage": "premiere_ligne",
+    "alignement": "centre",
+    "interligne": 1.15,
+    "lignes_max": 2,
+    "centre_x_px": 540,
+    "retour_ligne": true,
+    "largeur_max_px": 840,
+    "centre_bloc_y_px": 1488,
+    "mots_max_par_bloc": 7,
+    "ecart_baselines_px": 72,
+    "baseline_ligne1_y_px": 1488,
+    "mots_cibles_par_bloc": "3-6"
+  },
+  "genres_autorises": [
+    "corporate",
+    "impact",
+    "karaoke"
+  ],
+  "mesure_exacte": true
+}
