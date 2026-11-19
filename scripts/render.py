@@ -661,10 +661,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     tags = (f"\\1c{couleur_ass(col)}\\1a&HFF&\\3a&HFF&\\4a&HFF&\\fscx{int(echelle * .6)}\\fscy{int(echelle * .6)}"
                             f"\\t({a},{a + 1},\\1a&H00&\\3a&H00&\\4a{a_ombre})\\t({a},{a + fade + 60},\\fscx{echelle}\\fscy{echelle})")
                 elif mode == "karaoke":
+                    # mots a venir : gris ; mot prononce : couleur d'accent de la marque ; mots deja dits : restent allumes
                     inactif = couleur_ass(c.get("texte_inactif", c["texte"]))
-                    actif = couleur_ass(col if imp else (c.get("mot_cle_accent", "#FFD400") if cle else c["texte"]))
+                    en_cours = couleur_ass(col if imp else (c.get("mot_cle_accent") or c["texte"]))
+                    deja_dit = couleur_ass(col if imp else (c.get("mot_cle_accent", "#FFD400") if cle else c["texte"]))
                     tags = (f"\\1c{inactif}\\fscx{echelle}\\fscy{echelle}"
-                            f"\\t({a},{a + 1},\\1c{actif})\\t({fin_mot},{fin_mot + 1},\\1c{inactif})")
+                            f"\\t({a},{a + 1},\\1c{en_cours})\\t({fin_mot},{fin_mot + 1},\\1c{deja_dit})")
                 if genre in GENRES:
                     tags += f"\\b{abs(gras)}"
                     if genre == "impact" and not imp:
