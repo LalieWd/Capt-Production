@@ -685,8 +685,33 @@ def mesurer_luminosite(video, blocs, style):
             px = sorted(r.stdout)
             if px:
                 b["lum"] = sum(px[len(px) * 3 // 4:]) / max(len(px) - len(px) * 3 // 4, 1) / 255.0
+                b["lum_moy"] = sum(px) / len(px) / 255.0
         except Exception:
             pass
+
+
+def choisir_couleur_texte(blocs, style):
+    """Texte noir ou blanc : on calcule, pour chaque sous-titre, le contraste (norme WCAG) du blanc et du noir sur le fond
+    mesure, puis on garde la couleur dont la MOYENNE de contraste sur toute la video est la plus elevee.
+    Desactivable par style["texte_auto"] = false. Modifie le style en place, renvoie un message pour le compte rendu."""
+    if style.get("texte_auto", True) is False:
+        return None
+    lums = [b["lum_moy"] for b in blocs if b.get("lum_moy") is not None]
+    if not lums:
+        return None
+
+    def lin(v):
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    ys = [lin(v) for v in lums]
+    blanc = sum(1.05 / (y + 0.05) for y in ys) / len(ys)
+    noir = sum((y + 0.05) / 0.05 for y in ys) / len(ys)
+    c = style["couleurs"]
+    if noir > blanc:
+        c["texte"], c["mot_cle_principal"], c["mot_cle_secondaire"], c["texte_inactif"] = "#000000", "#000000", "#000000", "#4A4A4A"
+        style["_texte_noir"] = True
+    else:
+        c["texte"], c["mot_cle_principal"], c["mot_cle_secondaire"] = "#FFFFFF", "#FFFFFF", "#FFFFFF"
+    return f"contraste moyen blanc {blanc:.1f} / noir {noir:.1f} -> texte {'noir' if noir > blanc else 'blanc'}"
 
 
 def captures(video, blocs, sortie, n=6):
@@ -720,6 +745,10 @@ def phase_rendu(video, nom_video, client_saisi, sortie, subs_json, style_json):
         largeur = style["resolution"][0]
     blocs = blocs_depuis_subs(subs, style)
     mesurer_luminosite(video, blocs, style)      # fond clair derriere le texte : contour sombre automatique
+    choix = choisir_couleur_texte(blocs, style)  # texte noir ou blanc selon le meilleur contraste moyen
+    if choix:
+        print(choix)
+        alertes.append(choix)
     ass = render.generer_ass(blocs, style, largeur, hauteur, nom_police, [], DOSSIER_POLICES, charger_modeles_genres())
     open(os.path.join(sortie, "subtitles.ass"), "w", encoding="utf-8").write(ass)
     open(os.path.join(sortie, "subtitles.srt"), "w", encoding="utf-8").write(render.generer_srt(blocs))
