@@ -491,6 +491,26 @@ def couper_blocs_trop_longs(blocs, style):
     return res
 
 
+# ---------- lisibilite : contraste automatique ----------
+LISIBILITE_DEFAUT = {"auto": True, "seuil_1": 0.42, "seuil_2": 0.62, "contour_1_px": 3, "contour_2_px": 5}
+
+
+def tags_lisibilite(style, bloc, k):
+    """Contour sombre ajoute automatiquement quand le fond de la video, derriere le texte, est clair.
+    bloc["lum"] = luminosite (0 a 1) du fond derriere le texte, mesuree par le robot. Regle valable pour toutes les marques :
+    fond moyen (> seuil_1) contour 3 px ; fond clair (> seuil_2) contour 5 px. Jamais moins que le contour du style."""
+    cfg = dict(LISIBILITE_DEFAUT)
+    cfg.update(style.get("lisibilite") or {})
+    lum = bloc.get("lum")
+    if not cfg.get("auto") or lum is None:
+        return ""
+    px = cfg["contour_2_px"] if lum >= cfg["seuil_2"] else cfg["contour_1_px"] if lum >= cfg["seuil_1"] else 0
+    base = (style.get("contour") or {}).get("epaisseur_px", 0)
+    if px <= base:
+        return ""
+    return f"\\bord{px * k:.1f}\\3c&H000000&"
+
+
 # ---------- sortie ASS ----------
 def generer_ass(blocs, style, largeur, hauteur, nom_police, titres=None, dossier_polices="fonts", modeles_genres=None):
     global _DOSSIER_POLICES
@@ -617,13 +637,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             for li, (morceau, ech) in enumerate(zip(morceaux, echelles)):
                 baseline = (ml["baseline_ligne1_y_px"] + li * ml.get("ecart_baselines_px", 72)) * k
                 y = baseline - 0.763 * taille * ech
-                tag = f"\\an8\\pos({cx:.0f},{y:.0f})"
+                tag = f"\\an8\\pos({cx:.0f},{y:.0f})" + tags_lisibilite(style_marque, b, k)
                 if mode == "statique":
                     tag += f"\\fad({fade},{int(fade * .7)})"
                 lignes.append(f"Dialogue: 0,{temps_ass(b['debut'])},{temps_ass(b['fin'])},Defaut,,0,0,0,,{{{tag}}}{morceau}")
             continue
         corps = "\\N".join(morceaux)
-        debut_tag = f"\\an5\\pos({cx:.0f},{cy:.0f})"
+        debut_tag = f"\\an5\\pos({cx:.0f},{cy:.0f})" + tags_lisibilite(style_marque, b, k)
         if mode == "statique":
             debut_tag += f"\\fad({fade},{int(fade * .7)})"
         if ml.get("interligne", 1) != 1:
