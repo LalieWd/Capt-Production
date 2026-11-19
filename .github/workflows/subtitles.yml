@@ -93,6 +93,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Installer Pillow (mesure exacte des sous-titres)
+        run: python3 -m pip install --quiet pillow || python3 -m pip install --quiet --break-system-packages pillow
+
       - name: Installer FFmpeg
         timeout-minutes: 8
         run: |

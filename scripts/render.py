@@ -148,12 +148,23 @@ def mesurer(texte, style):
         return None
     cle = (f, taille_ass(style["police"]))
     if cle not in _MESURES:
-        from PIL import ImageFont
+        try:
+            from PIL import ImageFont
+        except ImportError:
+            return None
         ft = ImageFont.truetype(f, 200)
         asc, desc = ft.getmetrics()
         _MESURES[cle] = (ft, taille_ass(style["police"]) / ((asc + desc) / 200) / 200)   # px par unite de ft.getlength
     ft, k = _MESURES[cle]
     return ft.getlength(texte) * k
+
+
+def _pil_dispo():
+    try:
+        import PIL  # noqa: F401
+        return True
+    except ImportError:
+        return False
 
 
 def mesure_active(style):
@@ -164,7 +175,9 @@ def mesure_active(style):
     if not f:
         return False
     if style.get("mesure_exacte") is not None:
-        return bool(style["mesure_exacte"])
+        return bool(style["mesure_exacte"]) and _pil_dispo()
+    if not _pil_dispo():
+        return False
     from PIL import ImageFont
     ft = ImageFont.truetype(f, 200)
     asc, desc = ft.getmetrics()
