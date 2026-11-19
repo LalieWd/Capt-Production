@@ -156,9 +156,24 @@ def mesurer(texte, style):
     return ft.getlength(texte) * k
 
 
+def mesure_active(style):
+    """Mesure reelle du texte avec la police du style. Explicite via « mesure_exacte » ; sinon automatique des que
+    la police n'a pas le meme rapport taille ASS / taille reelle que Halyard (1,377), sur lequel l'estimation historique
+    est calee : sans cela, Circular Std ou Inter Tight sont sous-estimees de 15 a 40 % et les lignes debordent."""
+    f = police_mesure(style)
+    if not f:
+        return False
+    if style.get("mesure_exacte") is not None:
+        return bool(style["mesure_exacte"])
+    from PIL import ImageFont
+    ft = ImageFont.truetype(f, 200)
+    asc, desc = ft.getmetrics()
+    return abs((asc + desc) / 200 - 1.377) > 0.05
+
+
 def largeur_ligne(mots, style, taille):
-    """Largeur d'une ligne : mesure reelle si le style le demande (mesure_exacte), sinon estimation historique."""
-    if style.get("mesure_exacte") and police_mesure(style):
+    """Largeur d'une ligne : mesure reelle si active (voir mesure_active), sinon estimation historique."""
+    if mesure_active(style):
         maj = style["police"].get("casse") == "majuscules"
         total = 0.0
         for i, w in enumerate(mots):
@@ -432,6 +447,50 @@ def preparer_impact_ligne(ligne, style, taille):
                 w["impact_echelle"] = reduit
 
 
+def _tient(mots, style_bloc, taille):
+    """Vrai si le bloc tient dans lignes_max lignes de largeur_max_px (impacts et mots cles compris)."""
+    ml = style_bloc["mise_en_page"]
+    for w in mots:
+        w.setdefault("facteur_largeur", 1.0)
+    preparer_impact_ligne(mots, dict(style_bloc, mise_en_page=dict(ml, largeur_max_px=10 ** 6)), taille)
+    if len(mots) > cible_mots(ml)[2]:
+        return False
+    return all(largeur_ligne(l, style_bloc, taille) <= ml["largeur_max_px"] for l in repartir_lignes(mots, style_bloc)) \
+        and len(repartir_lignes(mots, style_bloc)) <= ml["lignes_max"]
+
+
+def couper_blocs_trop_longs(blocs, style):
+    """Un sous-titre qui ne tient pas dans le cadre (largeur_max_px x lignes_max, ou plus de mots que le plafond du style)
+    est coupe en deux, a la ponctuation ou a la pause la plus proche du milieu, jusqu'a ce que chaque morceau tienne.
+    Le temps de chaque mot est conserve."""
+    taille = taille_em(style["police"]) * 1.056
+    res = []
+
+    def traiter(b):
+        st = style_genre(style, b.get("genre")) if b.get("genre") in GENRES else style
+        mots = b["mots"]
+        if len(mots) < 2 or _tient(mots, st, taille):
+            res.append(b)
+            return
+        meilleur, score = None, None
+        for k in range(1, len(mots)):
+            a, c = mots[:k], mots[k:]
+            larg = max(largeur_ligne(a, st, taille), largeur_ligne(c, st, taille))
+            fin_phrase = a[-1]["mot"].rstrip()[-1:] in ".?!…,;:"
+            s = larg * (0.9 if fin_phrase else 1.0) * (1.0 if peut_couper_apres(a[-1]) else 1.35)
+            if len(a) == 1 or len(c) == 1:
+                s *= 1.15
+            if score is None or s < score:
+                meilleur, score = k, s
+        a, c = mots[:meilleur], mots[meilleur:]
+        for morceau in (a, c):
+            traiter({"debut": morceau[0]["debut"], "fin": morceau[-1]["fin"], "mots": morceau, "genre": b.get("genre")})
+
+    for b in blocs:
+        traiter(b)
+    return res
+
+
 # ---------- sortie ASS ----------
 def generer_ass(blocs, style, largeur, hauteur, nom_police, titres=None, dossier_polices="fonts", modeles_genres=None):
     global _DOSSIER_POLICES
@@ -491,7 +550,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         reduction = 1.0      # styles « mesure_exacte » : le bloc est reduit (70 % au plus) s'il deborde encore
         for ligne in mise_en_page:
             preparer_impact_ligne(ligne, style, taille_calc)
-            if style.get("mesure_exacte"):
+            if mesure_active(style):
                 reduction = min(reduction, max(0.7, ml["largeur_max_px"] / max(largeur_ligne(ligne, style, taille_calc), 1)))
         for ligne in mise_en_page:
             parts = []
