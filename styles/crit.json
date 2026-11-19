@@ -3,11 +3,11 @@
   "genre": "corporate",
   "ombre": {
     "active": true,
-    "taille": "small",
+    "taille": "medium",
     "couleur": "#000000",
-    "flou_px": 4,
-    "opacite": 0.5,
-    "decalage_px": 2
+    "flou_px": 8,
+    "opacite": 0.85,
+    "decalage_px": 4
   },
   "client": "Crit",
   "impact": {
@@ -99,8 +99,7 @@
   },
   "genres_autorises": [
     "corporate",
-    "impact",
-    "karaoke"
+    "impact"
   ],
   "mesure_exacte": true
 }
