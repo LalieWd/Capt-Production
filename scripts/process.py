@@ -743,13 +743,18 @@ def phase_rendu(video, nom_video, client_saisi, sortie, subs_json, style_json):
     if largeur > style["resolution"][0]:
         hauteur = int(round(hauteur * style["resolution"][0] / largeur / 2) * 2)
         largeur = style["resolution"][0]
+    modeles = charger_modeles_genres()
+    # par defaut, TOUTES les marques heritent des genres du modele
+    style.setdefault("genres_autorises", ["corporate", "impact", "karaoke"])
+    if "impact" not in style and modeles.get("impact", {}).get("impact"):
+        style["impact"] = render._remplacer(modeles["impact"]["impact"], render._variables_style(style))
     blocs = blocs_depuis_subs(subs, style)
     mesurer_luminosite(video, blocs, style)      # fond clair derriere le texte : contour sombre automatique
     choix = choisir_couleur_texte(blocs, style)  # texte noir ou blanc selon le meilleur contraste moyen
     if choix:
         print(choix)
         alertes.append(choix)
-    ass = render.generer_ass(blocs, style, largeur, hauteur, nom_police, [], DOSSIER_POLICES, charger_modeles_genres())
+    ass = render.generer_ass(blocs, style, largeur, hauteur, nom_police, [], DOSSIER_POLICES, modeles)
     open(os.path.join(sortie, "subtitles.ass"), "w", encoding="utf-8").write(ass)
     open(os.path.join(sortie, "subtitles.srt"), "w", encoding="utf-8").write(render.generer_srt(blocs))
 

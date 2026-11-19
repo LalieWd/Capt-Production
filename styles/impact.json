@@ -89,5 +89,18 @@
     "corporate",
     "impact",
     "karaoke"
-  ]
+  ],
+  "genre_regles": {
+    "police": {
+      "casse": "majuscules",
+      "gras": true,
+      "echelle_taille": 1.1
+    },
+    "animation": {
+      "mode": "pop"
+    },
+    "couleurs": {
+      "mot_cle_accent": "{accent}"
+    }
+  }
 }
