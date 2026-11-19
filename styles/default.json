@@ -1,82 +1,105 @@
 {
-  "client": "Style par défaut (sobre lisible)",
   "code": "DEFAULT",
-  "genre": "minimal",
-  "version": "1.1",
-  "resolution": [
-    1080,
-    1920
-  ],
-  "police": {
-    "famille": "Inter",
-    "graisse": "Bold",
-    "fichier": null,
-    "fallback": "Inter",
-    "taille_px": 64,
-    "casse": "phrase",
-    "gras": true
+  "genre": "corporate",
+  "ombre": {
+    "active": false,
+    "couleur": "#000000",
+    "flou_px": 2,
+    "opacite": 0.6,
+    "decalage_px": 2
   },
-  "couleurs": {
-    "texte": "#FFFFFF",
-    "texte_inactif": "#FFFFFF",
-    "mot_cle_principal": "#FFFFFF",
-    "mot_cle_secondaire": "#FFFFFF",
-    "mot_cle_accent": "#FFD400"
+  "client": "Style par défaut (sobre lisible)",
+  "impact": {
+    "echelle": 1.3,
+    "police_gras": {
+      "b": 0,
+      "famille": "Inter Black"
+    },
+    "effets_defaut": [
+      "agrandi"
+    ],
+    "effets_autorises": [
+      "gras",
+      "agrandi",
+      "capitales"
+    ]
+  },
+  "police": {
+    "casse": "phrase",
+    "famille": "Inter",
+    "fichier": "fonts/Inter-Bold.otf",
+    "graisse": "Bold",
+    "gras": true,
+    "nom_ass": "Inter Bold",
+    "fallback": "Inter Bold",
+    "taille_px": 72
+  },
+  "contenu": {
+    "emojis": false,
+    "ponctuation": true,
+    "chiffres_en_chiffres": true,
+    "espace_insecable_avant": "?!:;",
+    "affichage_pendant_silences": true
   },
   "contour": {
     "couleur": "#000000",
     "epaisseur_px": 5
   },
-  "ombre": {
-    "active": false,
-    "couleur": "#000000",
-    "opacite": 0.6,
-    "decalage_px": 2,
-    "flou_px": 2
-  },
-  "mise_en_page": {
-    "centre_x_px": 540,
-    "centre_bloc_y_px": 1400,
-    "largeur_max_px": 840,
-    "lignes_max": 2,
-    "mots_max_par_bloc": 4,
-    "interligne": 1.0
-  },
-  "mots_cles": {
-    "actif": false,
-    "echelle": 1.2,
-    "max_par_bloc": 1,
-    "frequence": "environ 1 bloc sur 2"
+  "version": "2.0",
+  "couleurs": {
+    "texte": "#FFFFFF",
+    "texte_inactif": "#B8B8B8",
+    "fond_mot_cle": null,
+    "mot_cle_accent": "#FFD400",
+    "mot_cle_principal": "#FFFFFF",
+    "mot_cle_secondaire": "#FFFFFF"
   },
   "animation": {
-    "mode": "statique",
-    "duree_fade_ms": 120
+    "mot": "fade_in",
+    "bloc": "aucune",
+    "mode": "progressive",
+    "duree_fade_ms": 100,
+    "remplacement_bloc": "coupe_seche",
+    "mise_en_page_figee": true
   },
-  "contenu": {
-    "emojis": false,
-    "ponctuation": true
-  },
-  "glossaire": [],
-  "format": "mobile_9_16",
-  "zone_sure": {
-    "haut_px": 250,
-    "bas_px": 420,
-    "cotes_px": 120
-  },
-  "impact": {
-    "effets_autorises": [
-      "gras",
-      "agrandi",
-      "capitales"
-    ],
-    "effets_defaut": [
-      "agrandi"
+  "mots_cles": {
+    "actif": true,
+    "gras": false,
+    "types": [
+      "blanc",
+      "jaune"
     ],
     "echelle": 1.3,
-    "police_gras": {
-      "famille": "Inter Black",
-      "b": 0
-    }
+    "frequence": "environ 1 bloc sur 4",
+    "max_par_bloc": 3,
+    "bleu_max_par_bloc": 2,
+    "rotation_couleurs": [
+      "mot_cle_principal",
+      "mot_cle_accent"
+    ]
   },
+  "resolution": [
+    1080,
+    1920
+  ],
+  "mise_en_page": {
+    "ancrage": "premiere_ligne",
+    "alignement": "centre",
+    "interligne": 1.15,
+    "lignes_max": 2,
+    "centre_x_px": 540,
+    "retour_ligne": true,
+    "largeur_max_px": 840,
+    "centre_bloc_y_px": 1488,
+    "mots_max_par_bloc": 6,
+    "ecart_baselines_px": 72,
+    "baseline_ligne1_y_px": 1488,
+    "mots_cibles_par_bloc": "3-5"
+  },
+  "genres_autorises": [
+    "corporate",
+    "impact",
+    "karaoke"
+  ],
   "mesure_exacte": true
 }
