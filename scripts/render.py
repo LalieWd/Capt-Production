@@ -504,6 +504,10 @@ def tags_lisibilite(style, bloc, k):
     lum = bloc.get("lum")
     if not cfg.get("auto") or lum is None:
         return ""
+    if style.get("_texte_noir"):                  # texte noir : contour BLANC quand le fond est sombre
+        lm = bloc.get("lum_moy", lum)
+        px = cfg["contour_2_px"] if lm <= 0.2 else cfg["contour_1_px"] if lm <= 0.35 else 0
+        return f"\\bord{px * k:.1f}\\3c&HFFFFFF&" if px else ""
     px = cfg["contour_2_px"] if lum >= cfg["seuil_2"] else cfg["contour_1_px"] if lum >= cfg["seuil_1"] else 0
     base = (style.get("contour") or {}).get("epaisseur_px", 0)
     if px <= base:
