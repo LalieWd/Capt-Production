@@ -621,7 +621,7 @@ def marquer_impact(mots, impact, cfg):
 
 
 def blocs_depuis_subs(subs, style):
-    """Transforme les sous-titres de n8n [{start, end, text, highlight?}] en blocs pour render (mots chronometres)."""
+    """Transforme les sous-titres de n8n [{start, end, text, highlight?, accent?, impact?, genre?}] en blocs pour render (mots chronometres)."""
     blocs = []
     cfg_impact = render.reglages_impact(style)
     for s in sorted(subs, key=lambda x: float(x["start"])):
@@ -639,11 +639,22 @@ def blocs_depuis_subs(subs, style):
             mots.append({"mot": jeton, "debut": t0, "fin": t1, "cle": None})
             t0 = t1
         surligner = {m for h in (s.get("highlight") or []) for m in render.normaliser(str(h)).split()}
+        accentues = {m for h in (s.get("accent") or []) for m in render.normaliser(str(h)).split()}
         for m in mots:
-            if render.normaliser(m["mot"]) in surligner:
+            n = render.normaliser(m["mot"])
+            if n in accentues:
+                m["cle"] = "accent"       # couleur d'accentuation de la marque (bleu pour Mazars)
+            elif n in surligner:
                 m["cle"] = "principal"
         marquer_impact(mots, s.get("impact"), cfg_impact)
         blocs.append({"debut": debut, "fin": fin, "mots": mots, "genre": genre_du_sous_titre(s)})
+    # Temps de lecture : le bloc reste affiche ~0,8 s + 0,06 s par caractere (au plus 1,5 s apres la voix),
+    # dans la limite du debut du bloc suivant.
+    for i, b in enumerate(blocs):
+        nb_car = len(" ".join(m["mot"] for m in b["mots"]))
+        voulu = min(b["debut"] + 0.8 + 0.06 * nb_car, b["fin"] + 1.5)
+        limite = blocs[i + 1]["debut"] - 0.04 if i + 1 < len(blocs) else voulu
+        b["fin"] = max(b["fin"], min(voulu, limite))
     for prev, cur in zip(blocs, blocs[1:]):               # jamais de chevauchement
         if cur["debut"] < prev["fin"] + 0.02:
             prev["fin"] = max(prev["debut"] + 0.1, cur["debut"] - 0.02)
