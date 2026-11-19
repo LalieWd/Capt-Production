@@ -100,5 +100,13 @@
     "corporate",
     "impact",
     "karaoke"
-  ]
+  ],
+  "genre_regles": {
+    "animation": {
+      "mode": "karaoke"
+    },
+    "couleurs": {
+      "mot_cle_accent": "{accent}"
+    }
+  }
 }

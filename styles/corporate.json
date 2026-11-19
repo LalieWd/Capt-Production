@@ -102,5 +102,13 @@
     "corporate",
     "impact",
     "karaoke"
-  ]
+  ],
+  "genre_regles": {
+    "police": {
+      "casse": "phrase"
+    },
+    "animation": {
+      "mode": "progressive"
+    }
+  }
 }

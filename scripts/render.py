@@ -339,6 +339,32 @@ GENRES = ("corporate", "impact", "karaoke")
 GRIS_INACTIF = "#B8B8B8"
 
 
+def _variables_style(style):
+    c = style["couleurs"]
+    return {"{accent}": c.get("mot_cle_accent") or c["texte"], "{texte}": c["texte"],
+            "{principal}": c.get("mot_cle_principal") or c["texte"]}
+
+
+def _remplacer(o, v):
+    if isinstance(o, str):
+        for k, val in v.items():
+            o = o.replace(k, val)
+        return o
+    if isinstance(o, dict):
+        return {k: _remplacer(x, v) for k, x in o.items()}
+    if isinstance(o, list):
+        return [_remplacer(x, v) for x in o]
+    return o
+
+
+def _fusion(base, surcharge):
+    for k, x in surcharge.items():
+        if isinstance(x, dict) and isinstance(base.get(k), dict):
+            _fusion(base[k], x)
+        else:
+            base[k] = x
+
+
 def style_genre(style, genre, modele=None):
     """Style de la marque habille d'un genre (corporate / impact / karaoke) choisi par l'agent pour un sous-titre.
     La police, les couleurs et la position de la marque sont conservees ; le genre change l'animation, la casse,
@@ -352,12 +378,16 @@ def style_genre(style, genre, modele=None):
     st["animation"] = dict(st["animation"], mode=ma.get("mode") or {"corporate": "progressive", "impact": "pop", "karaoke": "karaoke"}[genre],
                            duree_fade_ms=ma.get("duree_fade_ms", st["animation"].get("duree_fade_ms", 150)))
     p = st["police"]
+    # Regles du genre definies UNE fois dans le modele (Clients corporate / impact / karaoke, cle "genre_regles"),
+    # avec des variables {accent} {texte} {principal} remplacees par celles de la marque : valables pour toutes les marques.
+    regles = _remplacer(modele.get("genre_regles") or {}, _variables_style(st))
+    echelle_taille = (regles.get("police") or {}).pop("echelle_taille", None)
     if genre == "corporate":
         p["casse"] = "phrase"
     elif genre == "impact":
         p["casse"] = "majuscules"
         p["gras"] = True
-        ratio = 1.1
+        ratio = echelle_taille or 1.1
         if "taille_em_px" in p:
             p["taille_em_px"] = p["taille_em_px"] * ratio
         else:
@@ -367,6 +397,7 @@ def style_genre(style, genre, modele=None):
         if c.get("texte_inactif", c["texte"]).upper() == c["texte"].upper():
             c["texte_inactif"] = GRIS_INACTIF
         c["mot_cle_accent"] = couleur_impact(st, reglages_impact(st))
+    _fusion(st, regles)
     return st
 
 
